@@ -5,38 +5,29 @@
 
 
 GearRatioGraphItem::GearRatioGraphItem(const Graph &graph, GraphType type,
-  QGraphicsItem *parent) : GraphItem(graph, type, parent), _top(NAN)
+  int width, const QColor &color, QGraphicsItem *parent)
+  : GraphItem(graph, type, width, color, parent)
 {
-	qreal val = NAN;
-	_min = _max = graph.first().y();
-
-	for (int i = 1; i < graph.size(); i++) {
-		const GraphPoint &p = graph.at(i);
-
-		qreal val = _map.value(p.y());
-		_map.insert(p.y(), val + (p.s() - graph.at(i-1).s()));
-
-		if (p.y() < _min)
-			_min = p.y();
-		if (p.y() > _max)
-			_max = p.y();
-	}
-
-	for (QMap<qreal, qreal>::const_iterator it = _map.constBegin();
-	  it != _map.constEnd(); ++it) {
-		if (it == _map.constBegin()) {
-			val = it.value();
-			_top = it.key();
-		} else if (it.value() > val) {
-			val = it.value();
-			_top = it.key();
+	for (int i = 0; i < graph.size(); i++) {
+		const GraphSegment &segment = graph.at(i);
+		for (int j = 1; j < segment.size(); j++) {
+			qreal dx = segment.at(j).s() - segment.at(j-1).s();
+			_map.insert(segment.at(j).y(), _map.value(segment.at(j).y()) + dx);
 		}
 	}
 
-	setToolTip(toolTip());
+	qreal key = NAN, val = NAN;
+	for (QMap<qreal, qreal>::const_iterator it = _map.constBegin();
+	  it != _map.constEnd(); ++it) {
+		if (std::isnan(val) || it.value() > val) {
+			val = it.value();
+			key = it.key();
+		}
+	}
+	_top = key;
 }
 
-QString GearRatioGraphItem::toolTip() const
+QString GearRatioGraphItem::info() const
 {
 	ToolTip tt;
 	QLocale l(QLocale::system());

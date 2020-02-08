@@ -17,6 +17,7 @@ class GraphItem;
 class PathItem;
 class GridItem;
 class QGraphicsSimpleTextItem;
+class GraphicsScene;
 
 class GraphView : public QGraphicsView
 {
@@ -27,7 +28,7 @@ public:
 	~GraphView();
 
 	bool isEmpty() const {return _graphs.isEmpty();}
-	const QList<KV> &info() const {return _info->info();}
+	const QList<KV<QString, QString> > &info() const {return _info->info();}
 	void clear();
 
 	void plot(QPainter *painter, const QRectF &target, qreal scale);
@@ -46,11 +47,16 @@ signals:
 	void sliderPositionChanged(qreal);
 
 protected:
-	void addGraph(GraphItem *graph, int id = 0);
-
-	void showGraph(bool show, int id = 0);
+	void addGraph(GraphItem *graph);
+	void removeGraph(GraphItem *graph);
 	void setGraphType(GraphType type);
 	void setUnits(Units units);
+
+	void resizeEvent(QResizeEvent *e);
+	void mousePressEvent(QMouseEvent *e);
+	void wheelEvent(QWheelEvent *e);
+	void changeEvent(QEvent *e);
+	void paintEvent(QPaintEvent *e);
 
 	const QString &yLabel() const {return _yLabel;}
 	const QString &yUnits() const {return _yUnits;}
@@ -68,10 +74,11 @@ protected:
 	void redraw();
 	void addInfo(const QString &key, const QString &value);
 	void clearInfo();
-	void skipColor() {_palette.nextColor();}
 
-	QList<GraphItem*> _graphs;
 	GraphType _graphType;
+	Units _units;
+	Palette _palette;
+	int _width;
 
 private slots:
 	void emitSliderPositionChanged(const QPointF &pos);
@@ -87,19 +94,7 @@ private:
 	void removeItem(QGraphicsItem *item);
 	void addItem(QGraphicsItem *item);
 
-	void resizeEvent(QResizeEvent *e);
-	void mousePressEvent(QMouseEvent *e);
-
-	Units _units;
-	qreal _xScale, _yScale;
-	qreal _yOffset;
-	QString _xUnits, _yUnits;
-	QString _xLabel, _yLabel;
-	int _precision;
-	qreal _minYRange;
-	qreal _sliderPos;
-
-	QGraphicsScene *_scene;
+	GraphicsScene *_scene;
 
 	AxisItem *_xAxis, *_yAxis;
 	SliderItem *_slider;
@@ -107,12 +102,19 @@ private:
 	InfoItem *_info;
 	GridItem *_grid;
 	QGraphicsSimpleTextItem *_message;
+	QList<GraphItem*> _graphs;
 
-	QList<GraphItem*> _visible;
-	QSet<int> _hide;
 	QRectF _bounds;
-	Palette _palette;
-	int _width;
+	qreal _sliderPos;
+
+	qreal _xScale, _yScale;
+	qreal _yOffset;
+	QString _xUnits, _yUnits;
+	QString _xLabel, _yLabel;
+	int _precision;
+	qreal _minYRange;
+
+	qreal _zoom;
 };
 
 #endif // GRAPHVIEW_H

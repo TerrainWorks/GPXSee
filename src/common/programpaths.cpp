@@ -6,14 +6,17 @@
 #define MAP_DIR          "maps"
 #define POI_DIR          "POI"
 #define CSV_DIR          "csv"
+#define DEM_DIR          "DEM"
 #define TILES_DIR        "tiles"
 #define TRANSLATIONS_DIR "translations"
+#define STYLE_DIR        "style"
 #define ELLIPSOID_FILE   "ellipsoids.csv"
 #define GCS_FILE         "gcs.csv"
 #define PCS_FILE         "pcs.csv"
+#define TYP_FILE         "style.typ"
 
 
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+#if QT_VERSION < QT_VERSION_CHECK(5, 4, 0)
 
 #include <QApplication>
 
@@ -30,7 +33,7 @@
 #else
 #define USER_DIR        QDir::homePath() + QString("/.local/share/") \
 						  + qApp->applicationName()
-#define GLOBAL_DIR      QString("/usr/share/") + qApp->applicationName()
+#define GLOBAL_DIR      QString(PREFIX "/share/") + qApp->applicationName()
 #endif
 
 static QString dir(const QString &dirName, bool writable = false)
@@ -73,9 +76,28 @@ QString ProgramPaths::csvDir(bool writable)
 	return dir(CSV_DIR, writable);
 }
 
+QString ProgramPaths::demDir(bool writable)
+{
+	return dir(DEM_DIR, writable);
+}
+
+QString ProgramPaths::styleDir(bool writable)
+{
+	return dir(STYLE_DIR, writable);
+}
+
 QString ProgramPaths::tilesDir()
 {
-	return dir(TILES_DIR);
+#if defined(Q_OS_WIN32)
+	return QDir::homePath() + QString("/AppData/Local/")
+	  + qApp->applicationName() + QString("/cache/") + QString(TILES_DIR);
+#elif defined(Q_OS_MAC)
+	return QDir::homePath() + QString("/Library/Caches/")
+	  + qApp->applicationName() + QString("/" TILES_DIR);
+#else
+	return QDir::homePath() + QString("/.cache/") + qApp->applicationName()
+	  + QString("/" TILES_DIR);
+#endif
 }
 
 QString ProgramPaths::translationsDir()
@@ -98,6 +120,11 @@ QString ProgramPaths::pcsFile()
 	return file(dir(CSV_DIR), PCS_FILE);
 }
 
+QString ProgramPaths::typFile()
+{
+	return file(dir(STYLE_DIR), TYP_FILE);
+}
+
 #else // QT_VERSION < 5
 
 #include <QStandardPaths>
@@ -108,8 +135,8 @@ QString ProgramPaths::mapDir(bool writable)
 		return QDir(QStandardPaths::writableLocation(
 		  QStandardPaths::AppDataLocation)).filePath(MAP_DIR);
 	else
-		return QString(QStandardPaths::locate(QStandardPaths::AppDataLocation,
-		  MAP_DIR, QStandardPaths::LocateDirectory));
+		return QStandardPaths::locate(QStandardPaths::AppDataLocation,
+		  MAP_DIR, QStandardPaths::LocateDirectory);
 }
 
 QString ProgramPaths::poiDir(bool writable)
@@ -118,8 +145,8 @@ QString ProgramPaths::poiDir(bool writable)
 		return QDir(QStandardPaths::writableLocation(
 		  QStandardPaths::AppDataLocation)).filePath(POI_DIR);
 	else
-		return QString(QStandardPaths::locate(QStandardPaths::AppDataLocation,
-		  POI_DIR, QStandardPaths::LocateDirectory));
+		return QStandardPaths::locate(QStandardPaths::AppDataLocation,
+		  POI_DIR, QStandardPaths::LocateDirectory);
 }
 
 QString ProgramPaths::csvDir(bool writable)
@@ -128,20 +155,40 @@ QString ProgramPaths::csvDir(bool writable)
 		return QDir(QStandardPaths::writableLocation(
 		  QStandardPaths::AppDataLocation)).filePath(CSV_DIR);
 	else
-		return QString(QStandardPaths::locate(QStandardPaths::AppDataLocation,
-		  CSV_DIR, QStandardPaths::LocateDirectory));
+		return QStandardPaths::locate(QStandardPaths::AppDataLocation,
+		  CSV_DIR, QStandardPaths::LocateDirectory);
+}
+
+QString ProgramPaths::demDir(bool writable)
+{
+	if (writable)
+		return QDir(QStandardPaths::writableLocation(
+		  QStandardPaths::AppDataLocation)).filePath(DEM_DIR);
+	else
+		return QStandardPaths::locate(QStandardPaths::AppDataLocation,
+		  DEM_DIR, QStandardPaths::LocateDirectory);
+}
+
+QString ProgramPaths::styleDir(bool writable)
+{
+	if (writable)
+		return QDir(QStandardPaths::writableLocation(
+		  QStandardPaths::AppDataLocation)).filePath(STYLE_DIR);
+	else
+		return QStandardPaths::locate(QStandardPaths::AppDataLocation,
+		  STYLE_DIR, QStandardPaths::LocateDirectory);
 }
 
 QString ProgramPaths::tilesDir()
 {
-	return QString(QStandardPaths::locate(QStandardPaths::AppLocalDataLocation,
-	  TILES_DIR, QStandardPaths::LocateDirectory));
+	return QDir(QStandardPaths::writableLocation(
+	  QStandardPaths::CacheLocation)).filePath(TILES_DIR);
 }
 
 QString ProgramPaths::translationsDir()
 {
-	return QString(QStandardPaths::locate(QStandardPaths::AppDataLocation,
-	  TRANSLATIONS_DIR, QStandardPaths::LocateDirectory));
+	return QStandardPaths::locate(QStandardPaths::AppDataLocation,
+	  TRANSLATIONS_DIR, QStandardPaths::LocateDirectory);
 }
 
 QString ProgramPaths::ellipsoidsFile()
@@ -160,6 +207,12 @@ QString ProgramPaths::pcsFile()
 {
 	return QStandardPaths::locate(QStandardPaths::AppDataLocation,
 	  CSV_DIR "/" PCS_FILE, QStandardPaths::LocateFile);
+}
+
+QString ProgramPaths::typFile()
+{
+	return QStandardPaths::locate(QStandardPaths::AppDataLocation,
+	  STYLE_DIR "/" TYP_FILE, QStandardPaths::LocateFile);
 }
 
 #endif // QT_VERSION < 5

@@ -8,19 +8,17 @@ class ElevationGraphItem : public GraphItem
 	Q_OBJECT
 
 public:
-	ElevationGraphItem(const Graph &graph, GraphType type,
-	  QGraphicsItem *parent = 0);
+	ElevationGraphItem(const Graph &graph, GraphType type, int width,
+	  const QColor &color, QGraphicsItem *parent = 0);
 
 	qreal ascent() const {return _ascent;}
 	qreal descent() const {return _descent;}
-	qreal min() const {return _min;}
 	qreal max() const {return _max;}
+	qreal min() const {return _min;}
 
-	void setUnits(Units units);
+	QString info() const;
 
 private:
-	QString toolTip(Units units) const;
-
 	qreal _ascent, _descent, _min, _max;
 };
 

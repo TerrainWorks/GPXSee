@@ -1,0 +1,36 @@
+#ifndef PATHTICKITEM_H
+#define PATHTICKITEM_H
+
+#include <QFont>
+#include <QGraphicsItem>
+#include "graphicsscene.h"
+
+class PathTickItem : public GraphicsItem
+{
+public:
+	PathTickItem(const QRectF &tickRect, int value, QGraphicsItem *parent = 0);
+
+	QRectF boundingRect() const;
+	void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
+	  QWidget *widget);
+
+	void setPos(const QPointF &pos);
+	void setColor(const QColor &color) {_brush = QBrush(color);}
+
+	int type() const {return parentItem()->type();}
+	QString info() const {return static_cast<GraphicsItem*>(parentItem())->info();}
+
+	static QRect tickRect(int value);
+
+protected:
+	void mousePressEvent(QGraphicsSceneMouseEvent *event);
+
+private:
+	QRectF _tickRect;
+	QString _text;
+	QBrush _brush;
+
+	static QFont _font;
+};
+
+#endif // PATHTICKITEM_H

@@ -22,10 +22,10 @@ bool WMTSMap::loadWMTS()
 		return false;
 	}
 
-	_bounds = wmts.bounds();
 	_zooms = wmts.zooms();
 	_projection = wmts.projection();
 	_tileLoader->setUrl(wmts.tileUrl());
+	_bounds = RectD(wmts.bounds(), _projection);
 
 	if (_setup.coordinateSystem().axisOrder() == CoordinateSystem::Unknown)
 		_cs = _projection.coordinateSystem();
@@ -39,7 +39,7 @@ bool WMTSMap::loadWMTS()
 
 WMTSMap::WMTSMap(const QString &name, const WMTS::Setup &setup, qreal tileRatio,
   QObject *parent) : Map(parent), _name(name), _setup(setup), _tileLoader(0),
-  _zoom(0), _deviceRatio(1.0), _tileRatio(tileRatio), _valid(false)
+  _zoom(0), _mapRatio(1.0), _tileRatio(tileRatio), _valid(false)
 {
 	_tileLoader = new TileLoader(tilesDir(), this);
 	_tileLoader->setAuthorization(_setup.authorization());
@@ -77,14 +77,8 @@ void WMTSMap::updateTransform()
 	double pixelSpan = sd2res(z.scaleDenominator());
 	if (_projection.isGeographic())
 		pixelSpan /= deg2rad(WGS84_RADIUS);
-	PointD tileSpan(z.tile().width() * pixelSpan, z.tile().height() * pixelSpan);
-	PointD bottomRight(topLeft.x() + tileSpan.x() * z.matrix().width(),
-	  topLeft.y() - tileSpan.y() * z.matrix().height());
-
-	ReferencePoint tl(PointD(0, 0), topLeft);
-	ReferencePoint br(PointD(z.tile().width() * z.matrix().width(),
-	  z.tile().height() * z.matrix().height()), bottomRight);
-	_transform = Transform(tl, br);
+	_transform = Transform(ReferencePoint(PointD(0, 0), topLeft),
+	  PointD(pixelSpan, pixelSpan));
 }
 
 QRectF WMTSMap::bounds()
@@ -99,18 +93,18 @@ QRectF WMTSMap::bounds()
 	  * z.tile().height()), QSize(z.tile().width() * z.limits().width(),
 	  z.tile().height() * z.limits().height()));
 
-	bounds = _bounds.isValid() ? QRectF(ll2xy(_bounds.topLeft()),
-	  ll2xy(_bounds.bottomRight())) : QRectF();
-	return _bounds.isValid() ? tileBounds.intersected(bounds) : tileBounds;
+	if (_bounds.isValid())
+		bounds = QRectF(_transform.proj2img(_bounds.topLeft())
+		  / coordinatesRatio(), _transform.proj2img(_bounds.bottomRight())
+		  / coordinatesRatio());
+	return bounds.isValid() ? tileBounds.intersected(bounds) : tileBounds;
 }
 
 int WMTSMap::zoomFit(const QSize &size, const RectC &rect)
 {
 	if (rect.isValid()) {
-		PointD tl(_projection.ll2xy(rect.topLeft()));
-		PointD br(_projection.ll2xy(rect.bottomRight()));
-		PointD sc((br.x() - tl.x()) / size.width(), (tl.y() - br.y())
-		  / size.height());
+		RectD prect(rect, _projection);
+		PointD sc(prect.width() / size.width(), prect.height() / size.height());
 		double resolution = qMax(qAbs(sc.x()), qAbs(sc.y()));
 		if (_projection.isGeographic())
 			resolution *= deg2rad(WGS84_RADIUS);
@@ -151,12 +145,12 @@ int WMTSMap::zoomOut()
 
 qreal WMTSMap::coordinatesRatio() const
 {
-	return _deviceRatio > 1.0 ? _deviceRatio / _tileRatio : 1.0;
+	return _mapRatio > 1.0 ? _mapRatio / _tileRatio : 1.0;
 }
 
 qreal WMTSMap::imageRatio() const
 {
-	return _deviceRatio > 1.0 ? _deviceRatio : _tileRatio;
+	return _mapRatio > 1.0 ? _mapRatio : _tileRatio;
 }
 
 QSizeF WMTSMap::tileSize(const WMTS::Zoom &zoom) const

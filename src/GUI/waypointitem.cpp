@@ -1,7 +1,10 @@
 #include <QApplication>
 #include <QPainter>
+#include <QGraphicsSceneMouseEvent>
+#include <QLabel>
 #include "font.h"
 #include "tooltip.h"
+#include "popup.h"
 #include "waypointitem.h"
 
 
@@ -10,29 +13,54 @@
 #define FS(size) \
 	((int)((qreal)size * 1.41))
 
-QString WaypointItem::toolTip(Units units, CoordinatesFormat format)
+QString WaypointItem::info() const
 {
 	ToolTip tt;
 
 	if (!_waypoint.name().isEmpty())
 		tt.insert(qApp->translate("WaypointItem", "Name"), _waypoint.name());
 	tt.insert(qApp->translate("WaypointItem", "Coordinates"),
-	  Format::coordinates(_waypoint.coordinates(), format));
-	if (!std::isnan(_waypoint.elevation()))
+	  Format::coordinates(_waypoint.coordinates(), _format));
+	if (_waypoint.hasElevation())
 		tt.insert(qApp->translate("WaypointItem", "Elevation"),
-		  Format::elevation(_waypoint.elevation(), units));
-	if (!_waypoint.timestamp().isNull())
+		  Format::elevation(_waypoint.elevation(), _units));
+	if (_waypoint.timestamp().isValid())
 		tt.insert(qApp->translate("WaypointItem", "Date"),
 		  _waypoint.timestamp().toString(Qt::SystemLocaleShortDate));
-	if (!_waypoint.description().isNull())
+	if (!_waypoint.description().isEmpty())
 		tt.insert(qApp->translate("WaypointItem", "Description"),
 		  _waypoint.description());
+	if (_waypoint.address().isValid()) {
+		QString addr("<address>");
+		addr += _waypoint.address().street();
+		addr += "<br/>" + _waypoint.address().city();
+		if (!_waypoint.address().postalCode().isEmpty())
+			addr += "<br/>" + _waypoint.address().postalCode();
+		if (!_waypoint.address().state().isEmpty())
+			addr += "<br/>" + _waypoint.address().state();
+		if (!_waypoint.address().country().isEmpty())
+			addr += "<br/>" + _waypoint.address().country();
+		addr += "</address>";
+		tt.insert(qApp->translate("WaypointItem", "Address"), addr);
+	}
+	if (!_waypoint.links().isEmpty()) {
+		QString links;
+		for (int i = 0; i < _waypoint.links().size(); i++) {
+			const Link &link = _waypoint.links().at(i);
+			links.append(QString("<a href=\"%0\">%1</a>").arg(link.URL(),
+			  link.text().isEmpty() ? link.URL() : link.text()));
+			if (i != _waypoint.links().size() - 1)
+				links.append("<br/>");
+		}
+		tt.insert(qApp->translate("WaypointItem", "Links"), links);
+	}
+	tt.setImages(_waypoint.images());
 
 	return tt.toString();
 }
 
 WaypointItem::WaypointItem(const Waypoint &waypoint, Map *map,
-  QGraphicsItem *parent) : QGraphicsItem(parent)
+  QGraphicsItem *parent) : GraphicsItem(parent)
 {
 	_waypoint = waypoint;
 	_showLabel = true;
@@ -42,10 +70,12 @@ WaypointItem::WaypointItem(const Waypoint &waypoint, Map *map,
 	_font.setPixelSize(FS(_size));
 	_font.setFamily(FONT_FAMILY);
 
+	_units = Metric;
+	_format = DecimalDegrees;
+
 	updateCache();
 
 	setPos(map->ll2xy(waypoint.coordinates()));
-	setToolTip(toolTip(Metric, DecimalDegrees));
 	setCursor(Qt::ArrowCursor);
 	setAcceptHoverEvents(true);
 }
@@ -115,7 +145,8 @@ void WaypointItem::setColor(const QColor &color)
 
 void WaypointItem::setToolTipFormat(Units units, CoordinatesFormat format)
 {
-	setToolTip(toolTip(units, format));
+	_units = units;
+	_format = format;
 }
 
 void WaypointItem::showLabel(bool show)
@@ -146,4 +177,11 @@ void WaypointItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 	_font.setBold(false);
 	updateCache();
 	setZValue(zValue() - 1.0);
+}
+
+void WaypointItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+	Popup::show(event->screenPos(), info(), event->widget());
+	/* Do not propagate the event any further as lower stacked items (path
+	   items) would replace the popup with their own popup */
 }

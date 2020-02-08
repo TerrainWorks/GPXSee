@@ -3,12 +3,15 @@
 
 #include "graphtab.h"
 
+class HeartRateGraphItem;
+
 class HeartRateGraph : public GraphTab
 {
 	Q_OBJECT
 
 public:
 	HeartRateGraph(QWidget *parent = 0);
+	~HeartRateGraph();
 
 	QString label() const {return tr("Heart rate");}
 	QList<GraphItem*> loadData(const Data &data);
@@ -20,9 +23,10 @@ private:
 	qreal max() const {return bounds().bottom();}
 	void setInfo();
 
-	QList<QPointF> _avg;
+	QVector<QPointF> _avg;
 
 	bool _showTracks;
+	QList<HeartRateGraphItem*> _tracks;
 };
 
 #endif // HEARTRATEGRAPH_H

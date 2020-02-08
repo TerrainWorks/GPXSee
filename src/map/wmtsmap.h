@@ -4,6 +4,7 @@
 #include "transform.h"
 #include "projection.h"
 #include "map.h"
+#include "rectd.h"
 #include "wmts.h"
 
 class TileLoader;
@@ -31,7 +32,8 @@ public:
 
 	void draw(QPainter *painter, const QRectF &rect, Flags flags);
 
-	void setDevicePixelRatio(qreal ratio) {_deviceRatio = ratio;}
+	void setDevicePixelRatio(qreal /*deviceRatio*/, qreal mapRatio)
+	  {_mapRatio = mapRatio;}
 	void clearCache();
 
 	bool isValid() const {return _valid;}
@@ -49,13 +51,13 @@ private:
 	QString _name;
 	WMTS::Setup _setup;
 	TileLoader *_tileLoader;
-	RectC _bounds;
+	RectD _bounds;
 	QList<WMTS::Zoom> _zooms;
 	Projection _projection;
 	Transform _transform;
 	CoordinateSystem _cs;
 	int _zoom;
-	qreal _deviceRatio, _tileRatio;
+	qreal _mapRatio, _tileRatio;
 
 	bool _valid;
 	QString _errorString;

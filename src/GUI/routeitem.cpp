@@ -7,7 +7,7 @@
 #include "routeitem.h"
 
 
-QString RouteItem::toolTip(Units units) const
+QString RouteItem::info() const
 {
 	ToolTip tt;
 
@@ -15,7 +15,19 @@ QString RouteItem::toolTip(Units units) const
 		tt.insert(tr("Name"), _name);
 	if (!_desc.isEmpty())
 		tt.insert(tr("Description"), _desc);
-	tt.insert(tr("Distance"), Format::distance(_path.last().distance(), units));
+	tt.insert(tr("Distance"), Format::distance(path().last().last().distance(),
+	  _units));
+	if (!_links.isEmpty()) {
+		QString links;
+		for (int i = 0; i < _links.size(); i++) {
+			const Link &link = _links.at(i);
+			links.append(QString("<a href=\"%0\">%1</a>").arg(link.URL(),
+			  link.text().isEmpty() ? link.URL() : link.text()));
+			if (i != _links.size() - 1)
+				links.append("<br/>");
+		}
+		tt.insert(tr("Links"), links);
+	}
 
 	return tt.toString();
 }
@@ -23,48 +35,35 @@ QString RouteItem::toolTip(Units units) const
 RouteItem::RouteItem(const Route &route, Map *map, QGraphicsItem *parent)
   : PathItem(route.path(), map, parent)
 {
-	const QVector<Waypoint> &waypoints = route.waypoints();
+	const RouteData &waypoints = route.data();
 
+	_waypoints.resize(waypoints.size());
 	for (int i = 0; i < waypoints.size(); i++)
-		new WaypointItem(waypoints.at(i), map, this);
+		_waypoints[i] = new WaypointItem(waypoints.at(i), map, this);
 
 	_name = route.name();
 	_desc = route.description();
-	_units = Metric;
+	_links = route.links();
 	_coordinatesFormat = DecimalDegrees;
-
-	setToolTip(toolTip(Metric));
 }
 
 void RouteItem::setMap(Map *map)
 {
-	QList<QGraphicsItem *> childs =	childItems();
-	for (int i = 0; i < childs.count(); i++) {
-		if (childs.at(i) != _marker) {
-			WaypointItem *wi = static_cast<WaypointItem*>(childs.at(i));
-			wi->setMap(map);
-		}
-	}
+	for (int i = 0; i < _waypoints.count(); i++)
+		_waypoints[i]->setMap(map);
 
 	PathItem::setMap(map);
 }
 
-void RouteItem::setUnits(Units units)
+void RouteItem::setUnits(Units u)
 {
-	if (_units == units)
+	if (_units == u)
 		return;
 
-	_units = units;
+	for (int i = 0; i < _waypoints.count(); i++)
+		_waypoints[i]->setToolTipFormat(u, _coordinatesFormat);
 
-	setToolTip(toolTip(_units));
-
-	QList<QGraphicsItem *> childs =	childItems();
-	for (int i = 0; i < childs.count(); i++) {
-		if (childs.at(i) != _marker) {
-			WaypointItem *wi = static_cast<WaypointItem*>(childs.at(i));
-			wi->setToolTipFormat(_units, _coordinatesFormat);
-		}
-	}
+	PathItem::setUnits(u);
 }
 
 void RouteItem::setCoordinatesFormat(CoordinatesFormat format)
@@ -74,30 +73,18 @@ void RouteItem::setCoordinatesFormat(CoordinatesFormat format)
 
 	_coordinatesFormat = format;
 
-	QList<QGraphicsItem *> childs =	childItems();
-	for (int i = 0; i < childs.count(); i++) {
-		if (childs.at(i) != _marker) {
-			WaypointItem *wi = static_cast<WaypointItem*>(childs.at(i));
-			wi->setToolTipFormat(_units, _coordinatesFormat);
-		}
-	}
+	for (int i = 0; i < _waypoints.count(); i++)
+		_waypoints[i]->setToolTipFormat(_units, _coordinatesFormat);
 }
 
 void RouteItem::showWaypoints(bool show)
 {
-	QList<QGraphicsItem *> childs =	childItems();
-	for (int i = 0; i < childs.count(); i++)
-		if (childs.at(i) != _marker)
-			childs.at(i)->setVisible(show);
+	for (int i = 0; i < _waypoints.count(); i++)
+		_waypoints[i]->setVisible(show);
 }
 
 void RouteItem::showWaypointLabels(bool show)
 {
-	QList<QGraphicsItem *> childs =	childItems();
-	for (int i = 0; i < childs.count(); i++) {
-		if (childs.at(i) != _marker) {
-			WaypointItem *wi = static_cast<WaypointItem*>(childs.at(i));
-			wi->showLabel(show);
-		}
-	}
+	for (int i = 0; i < _waypoints.count(); i++)
+		_waypoints[i]->showLabel(show);
 }

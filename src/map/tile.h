@@ -12,7 +12,7 @@ class Tile
 public:
 	Tile() {}
 	Tile(const QPoint &xy, const QVariant &zoom, const RectD &bbox = RectD())
-		{_xy = xy; _zoom = zoom; _bbox = bbox;}
+	  : _xy(xy), _zoom(zoom), _bbox(bbox) {}
 
 	const QVariant &zoom() const {return _zoom;}
 	const QPoint &xy() const {return _xy;}
@@ -20,8 +20,8 @@ public:
 	QPixmap& pixmap() {return _pixmap;}
 
 private:
-	QVariant _zoom;
 	QPoint _xy;
+	QVariant _zoom;
 	RectD _bbox;
 	QPixmap _pixmap;
 };

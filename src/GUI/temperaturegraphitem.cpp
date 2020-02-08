@@ -4,32 +4,20 @@
 
 
 TemperatureGraphItem::TemperatureGraphItem(const Graph &graph, GraphType type,
-  QGraphicsItem *parent) : GraphItem(graph, type, parent)
+  int width, const QColor &color, QGraphicsItem *parent)
+  : GraphItem(graph, type, width, color, parent)
 {
-	qreal sum = 0;
-	_min = _max = graph.first().y();
-
-	for (int j = 1; j < graph.size(); j++) {
-		qreal y = graph.at(j).y();
-
-		sum += graph.at(j).y() * (graph.at(j).s() - graph.at(j-1).s());
-
-		if (y > _max)
-			_max = y;
-		if (y < _min)
-			_min = y;
-	}
-	_avg = sum/graph.last().s();
-
-	setToolTip(toolTip(Metric));
+	_min = GraphItem::min();
+	_max = GraphItem::max();
+	_avg = GraphItem::avg();
 }
 
-QString TemperatureGraphItem::toolTip(Units units) const
+QString TemperatureGraphItem::info() const
 {
 	ToolTip tt;
-	qreal scale = (units == Metric) ? 1.0 : C2FS;
-	qreal offset = (units == Metric) ? 0 : C2FO;
-	QString su = (units == Metric) ?
+	qreal scale = (_units == Metric) ? 1.0 : C2FS;
+	qreal offset = (_units == Metric) ? 0 : C2FO;
+	QString su = (_units == Metric) ?
 	  QChar(0x00B0) + tr("C") : QChar(0x00B0) + tr("F");
 	QLocale l(QLocale::system());
 
@@ -41,9 +29,4 @@ QString TemperatureGraphItem::toolTip(Units units) const
 	  + UNIT_SPACE + su);
 
 	return tt.toString();
-}
-
-void TemperatureGraphItem::setUnits(Units units)
-{
-	setToolTip(toolTip(units));
 }

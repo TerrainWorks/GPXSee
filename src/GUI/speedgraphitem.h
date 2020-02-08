@@ -9,22 +9,19 @@ class SpeedGraphItem : public GraphItem
 	Q_OBJECT
 
 public:
-	SpeedGraphItem(const Graph &graph, GraphType type, qreal movingTime,
-	  QGraphicsItem *parent = 0);
+	SpeedGraphItem(const Graph &graph, GraphType type, int width,
+	  const QColor &color, qreal movingTime, QGraphicsItem *parent = 0);
 
-	qreal max() const {return _max;}
 	qreal avg() const {return _avg;}
 	qreal mavg() const {return _mavg;}
+	qreal max() const {return _max;}
 
-	void setUnits(Units units);
+	QString info() const;
+
 	void setTimeType(TimeType type);
 
 private:
-	QString toolTip() const;
-
 	qreal _avg, _mavg, _max;
-
-	Units _units;
 	TimeType _timeType;
 };
 

@@ -14,6 +14,11 @@ TemperatureGraph::TemperatureGraph(QWidget *parent) : GraphTab(parent)
 	setSliderPrecision(1);
 }
 
+TemperatureGraph::~TemperatureGraph()
+{
+	qDeleteAll(_tracks);
+}
+
 void TemperatureGraph::setInfo()
 {
 	if (_showTracks) {
@@ -34,24 +39,33 @@ QList<GraphItem*> TemperatureGraph::loadData(const Data &data)
 	QList<GraphItem*> graphs;
 
 	for (int i = 0; i < data.tracks().count(); i++) {
-		const Graph &graph = data.tracks().at(i)->temperature();
+		const Track &track = data.tracks().at(i);
+		const Graph &graph = track.temperature();
 
-		if (graph.size() < 2) {
-			skipColor();
+		if (!graph.isValid()) {
+			_palette.nextColor();
 			graphs.append(0);
 		} else {
 			TemperatureGraphItem *gi = new TemperatureGraphItem(graph,
-			  _graphType);
-			GraphView::addGraph(gi);
-			_avg.append(QPointF(data.tracks().at(i)->distance(), gi->avg()));
+			  _graphType, _width, _palette.nextColor());
+			gi->setUnits(_units);
+
+			_tracks.append(gi);
+			if (_showTracks)
+				addGraph(gi);
+
+			_avg.append(QPointF(track.distance(), gi->avg()));
 			graphs.append(gi);
 		}
 	}
 
 	for (int i = 0; i < data.routes().count(); i++) {
-		skipColor();
+		_palette.nextColor();
 		graphs.append(0);
 	}
+
+	for (int i = 0; i < data.areas().count(); i++)
+		_palette.nextColor();
 
 	setInfo();
 	redraw();
@@ -62,11 +76,11 @@ QList<GraphItem*> TemperatureGraph::loadData(const Data &data)
 qreal TemperatureGraph::avg() const
 {
 	qreal sum = 0, w = 0;
-	QList<QPointF>::const_iterator it;
 
-	for (it = _avg.begin(); it != _avg.end(); it++) {
-		sum += it->y() * it->x();
-		w += it->x();
+	for (int i = 0; i < _avg.size(); i++) {
+		const QPointF &p = _avg.at(i);
+		sum += p.y() * p.x();
+		w += p.x();
 	}
 
 	return (sum / w);
@@ -74,9 +88,12 @@ qreal TemperatureGraph::avg() const
 
 void TemperatureGraph::clear()
 {
+	qDeleteAll(_tracks);
+	_tracks.clear();
+
 	_avg.clear();
 
-	GraphView::clear();
+	GraphTab::clear();
 }
 
 void TemperatureGraph::setYUnits(Units units)
@@ -104,7 +121,13 @@ void TemperatureGraph::showTracks(bool show)
 {
 	_showTracks = show;
 
-	showGraph(show);
+	for (int i = 0; i < _tracks.size(); i++) {
+		if (show)
+			addGraph(_tracks.at(i));
+		else
+			removeGraph(_tracks.at(i));
+	}
+
 	setInfo();
 
 	redraw();

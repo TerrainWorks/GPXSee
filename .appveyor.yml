@@ -1,22 +1,33 @@
-version: 7.0.{build}
-configuration: Release
-platform: Any CPU
+version: 7.20.{build}
+
+configuration:
+  - Release
+
+image:
+  - Visual Studio 2017
+
 environment:
   NSISDIR: C:\Program Files (x86)\NSIS
   matrix:
-  - QTDIR: C:\Qt\5.11\msvc2015
-    PLATFORM: x86
+  - QTDIR: C:\Qt\5.13\msvc2017
     NSI: gpxsee.nsi
-    OPENSSLDIR: C:\OpenSSL-Win32\bin
-  - QTDIR: C:\Qt\5.11\msvc2015_64
-    PLATFORM: x86_amd64
+    VCVARS: vcvars32.bat
+    OPENSSLDIR: C:\OpenSSL-v111-Win32\bin
+    LIBCRYPTO: libssl-1_1.dll
+    LIBSSL: libcrypto-1_1.dll
+  - QTDIR: C:\Qt\5.13\msvc2017_64
     NSI: gpxsee64.nsi
-    OPENSSLDIR: C:\OpenSSL-Win64\bin
+    VCVARS: vcvars64.bat
+    OPENSSLDIR: C:\OpenSSL-v111-Win64\bin
+    LIBCRYPTO: libssl-1_1-x64.dll
+    LIBSSL: libcrypto-1_1-x64.dll    
+
 install:
 - cmd: >-
     set PATH=%QTDIR%\bin;%NSISDIR%;%PATH%
 
-    call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" %PLATFORM%
+    call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\"%VCVARS%
+
 build_script:
 - cmd: >-
     lrelease gpxsee.pro
@@ -44,9 +55,9 @@ build_script:
 
     copy licence.txt installer
 
-    copy %OPENSSLDIR%\libeay32.dll installer
+    copy %OPENSSLDIR%\%LIBCRYPTO% installer
 
-    copy %OPENSSLDIR%\ssleay32.dll installer
+    copy %OPENSSLDIR%\%LIBSSL% installer
 
 
     makensis.exe installer\%NSI%

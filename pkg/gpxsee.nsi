@@ -7,7 +7,7 @@
 ; The name of the installer
 Name "GPXSee"
 ; Program version
-!define VERSION "7.0"
+!define VERSION "7.20"
 
 ; The file to write
 OutFile "GPXSee-${VERSION}.exe"
@@ -106,17 +106,21 @@ Section "GPXSee" SEC_APP
 
   ; Associate file formats
   DetailPrint "Associating file types..."
-  !insertmacro FILE_ASSOCIATION_ADD "gpx" "GPS Exchange Format" 4
-  !insertmacro FILE_ASSOCIATION_ADD "tcx" "Training Center XML" 5
-  !insertmacro FILE_ASSOCIATION_ADD "kml" "Keyhole Markup Language" 6
-  !insertmacro FILE_ASSOCIATION_ADD "fit" "Flexible and Interoperable Data Transfer" 7
-  !insertmacro FILE_ASSOCIATION_ADD "igc" "Flight Recorder Data Format" 8
-  !insertmacro FILE_ASSOCIATION_ADD "nmea" "NMEA 0183 data" 9
-  !insertmacro FILE_ASSOCIATION_ADD "plt" "OziExplorer Track Point File" 10
-  !insertmacro FILE_ASSOCIATION_ADD "rte" "OziExplorer Route File" 11
+  !insertmacro FILE_ASSOCIATION_ADD "gpx" "GPS Exchange Format" 8
+  !insertmacro FILE_ASSOCIATION_ADD "tcx" "Training Center XML" 9
+  !insertmacro FILE_ASSOCIATION_ADD "kml" "Keyhole Markup Language" 10
+  !insertmacro FILE_ASSOCIATION_ADD "fit" "Flexible and Interoperable Data Transfer" 11
+  !insertmacro FILE_ASSOCIATION_ADD "igc" "Flight Recorder Data Format" 12
+  !insertmacro FILE_ASSOCIATION_ADD "nmea" "NMEA 0183 Data" 13
+  !insertmacro FILE_ASSOCIATION_ADD "plt" "OziExplorer Track Point File" 14
+  !insertmacro FILE_ASSOCIATION_ADD "rte" "OziExplorer Route File" 15
   !insertmacro FILE_ASSOCIATION_ADD "wpt" "OziExplorer Waypoint File" 1
   !insertmacro FILE_ASSOCIATION_ADD "loc" "Geocaching.com Waypoint File" 2
   !insertmacro FILE_ASSOCIATION_ADD "slf" "Sigma Log File" 3
+  !insertmacro FILE_ASSOCIATION_ADD "geojson" "GeoJSON" 4
+  !insertmacro FILE_ASSOCIATION_ADD "cup" "SeeYou CUP File" 5
+  !insertmacro FILE_ASSOCIATION_ADD "gpi" "Garmin POI File" 6
+  !insertmacro FILE_ASSOCIATION_ADD "sml" "Suunto Markup Language" 7
   System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (0x08000000, 0, 0, 0)'
 
 SectionEnd
@@ -131,6 +135,7 @@ Section "QT framework" SEC_QT
   File "Qt5PrintSupport.dll"
   File "Qt5Network.dll"
   File "Qt5Sql.dll"
+  File "Qt5Concurrent.dll"
   File /r "platforms"
   File /r "imageformats"
   File /r "printsupport"
@@ -143,30 +148,17 @@ Section "MSVC runtime" SEC_MSVC
 
   SectionIn RO
 
-  DetailPrint "Checking whether Visual C++ 2015 Redistributable is already installed..."
-  ${If} ${RunningX64}
-    ReadRegDword $R0 HKLM "SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x86" "Installed"
-  ${Else}
-    ReadRegDword $R0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x86" "Installed"
-  ${EndIf}
-
-  StrCmp $R0 "1" 0 +3
-  DetailPrint "Visual C++ 2015 Redistributable is already installed, skipping install."
-  Goto done
-
-  DetailPrint "Installing Visual C++ 2015 Redistributable..."
   SetOutPath $TEMP
-  File "vcredist_x86.exe"
-  ExecWait '"$TEMP\vcredist_x86.exe" /install /quiet /norestart'
-  SetOutPath $INSTDIR
+  File "vc_redist.x86.exe"
+  ExecWait '"$TEMP\vc_redist.x86.exe" /install /quiet /norestart'
+  SetOutPath $INSTDIR    
 
-  done:
 SectionEnd
 
 Section "OpenSSL" SEC_OPENSSL
 
-  File "libeay32.dll"
-  File "ssleay32.dll"
+  File "libcrypto-1_1.dll"
+  File "libssl-1_1.dll"
 
 SectionEnd
 
@@ -184,10 +176,15 @@ SectionGroup "Localization" SEC_LOCALIZATION
   !insertmacro LOCALIZATION "Finnish" "fi"
   !insertmacro LOCALIZATION "French" "fr"
   !insertmacro LOCALIZATION "German" "de"
+  !insertmacro LOCALIZATION "Hungarian" "hu"
   !insertmacro LOCALIZATION "Norwegian" "nb"
   !insertmacro LOCALIZATION "Polish" "pl"
+  !insertmacro LOCALIZATION "Portuguese (Brazil)" "pt_BR"
   !insertmacro LOCALIZATION "Russian" "ru"
+  !insertmacro LOCALIZATION "Spanish" "es"
   !insertmacro LOCALIZATION "Swedish" "sv"
+  !insertmacro LOCALIZATION "Turkish" "tr"
+  !insertmacro LOCALIZATION "Ukrainian" "uk"
 SectionGroupEnd
 
 ;--------------------------------
@@ -221,6 +218,10 @@ Section "Uninstall"
   !insertmacro FILE_ASSOCIATION_REMOVE "wpt"
   !insertmacro FILE_ASSOCIATION_REMOVE "loc"
   !insertmacro FILE_ASSOCIATION_REMOVE "slf"
+  !insertmacro FILE_ASSOCIATION_REMOVE "geojson"
+  !insertmacro FILE_ASSOCIATION_REMOVE "cup"
+  !insertmacro FILE_ASSOCIATION_REMOVE "gpi"
+  !insertmacro FILE_ASSOCIATION_REMOVE "sml"
   System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (0x08000000, 0, 0, 0)'
 
 SectionEnd
@@ -233,7 +234,7 @@ SectionEnd
 LangString DESC_QT ${LANG_ENGLISH} \
   "QT cross-platform application framework."
 LangString DESC_MSVC ${LANG_ENGLISH} \
-  "Visual C++ 2015 runtime components. If already installed, will be skipped."
+  "Microsoft Visual C++ 2017 runtime. If already installed, will be skipped."
 LangString DESC_OPENSSL ${LANG_ENGLISH} \
   "OpenSSL library. Required for HTTPS to work."
 LangString DESC_ANGLE ${LANG_ENGLISH} \

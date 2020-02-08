@@ -6,6 +6,7 @@
 #include "data/track.h"
 #include "pathitem.h"
 #include "units.h"
+#include "graphicsscene.h"
 
 class Map;
 
@@ -16,13 +17,12 @@ class TrackItem : public PathItem
 public:
 	TrackItem(const Track &track, Map *map, QGraphicsItem *parent = 0);
 
-	void setUnits(Units units);
+	QString info() const;
 
 private:
-	QString toolTip(Units units) const;
-
 	QString _name;
 	QString _desc;
+	QVector<Link> _links;
 	QDateTime _date;
 	qreal _time;
 	qreal _movingTime;

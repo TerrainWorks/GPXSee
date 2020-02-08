@@ -13,7 +13,8 @@ class OnlineMap : public Map
 public:
 	OnlineMap(const QString &name, const QString &url, const Range &zooms,
 	  const RectC &bounds, qreal tileRatio, const Authorization &authorization,
-	  bool invertY, QObject *parent = 0);
+	  int tileSize, bool scalable, bool invertY, bool quadTiles,
+	  QObject *parent = 0);
 
 	QString name() const {return _name;}
 
@@ -31,7 +32,7 @@ public:
 
 	void draw(QPainter *painter, const QRectF &rect, Flags flags);
 
-	void setDevicePixelRatio(qreal ratio) {_deviceRatio = ratio;}
+	void setDevicePixelRatio(qreal deviceRatio, qreal mapRatio);
 	void clearCache() {_tileLoader->clearCache();}
 
 private:
@@ -45,7 +46,9 @@ private:
 	Range _zooms;
 	RectC _bounds;
 	int _zoom;
-	qreal _deviceRatio, _tileRatio;
+	qreal _mapRatio, _tileRatio;
+	int _tileSize;
+	bool _scalable;
 	bool _invertY;
 };
 

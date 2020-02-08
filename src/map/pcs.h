@@ -3,6 +3,7 @@
 
 #include <QDebug>
 #include <QList>
+#include "common/kv.h"
 #include "gcs.h"
 #include "linearunits.h"
 #include "coordinatesystem.h"
@@ -34,11 +35,12 @@ public:
 	static void loadList(const QString &path);
 	static const PCS *pcs(int id);
 	static const PCS *pcs(const GCS *gcs, int proj);
+	static QList<KV<int, QString> > list();
 
 private:
 	class Entry;
 
-	static QList<PCS::Entry> defaults();
+	static QList<Entry> defaults();
 
 	const GCS *_gcs;
 	Projection::Method _method;

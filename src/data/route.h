@@ -13,7 +13,7 @@ public:
 
 	Path path() const;
 
-	const QVector<Waypoint> &waypoints() const {return _data;}
+	const RouteData &data() const {return _data;}
 
 	Graph elevation() const;
 
@@ -21,11 +21,12 @@ public:
 
 	const QString &name() const {return _data.name();}
 	const QString &description() const {return _data.description();}
+	const QVector<Link> &links() const {return _data.links();}
 
-	bool isNull() const {return (_data.count() < 2);}
+	bool isValid() const {return _data.size() >= 2;}
 
 private:
-	const RouteData &_data;
+	RouteData _data;
 	QVector<qreal> _distance;
 };
 

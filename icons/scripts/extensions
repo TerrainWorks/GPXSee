@@ -1,6 +1,7 @@
 fit:#006600
 gpx:#003399
 igc:#ff3300
+json:#003333
 kml:#990000
 nmea:#0083d7
 plt:#66ff00
@@ -9,3 +10,6 @@ tcx:#ffcc00
 wpt:#66ff00
 loc:#556677
 slf:#881199
+cup:#20a810
+gpi:#fca314
+sml:#6434eb

@@ -29,7 +29,7 @@ public:
 
 	void load();
 	void unload();
-	void setDevicePixelRatio(qreal ratio) {_deviceRatio = ratio;}
+	void setDevicePixelRatio(qreal deviceRatio, qreal mapRatio);
 
 	bool isValid() const {return _valid;}
 	QString errorString() const {return _errorString;}
@@ -40,6 +40,7 @@ private:
 	qreal coordinatesRatio() const;
 	qreal imageRatio() const;
 	QByteArray tileData(int zoom, const QPoint &tile) const;
+	void drawTile(QPainter *painter, QPixmap &pixmap, QPointF &tp);
 
 	QSqlDatabase _db;
 
@@ -48,7 +49,9 @@ private:
 	Range _zooms;
 	int _zoom;
 	int _tileSize;
-	qreal _deviceRatio, _tileRatio;
+	qreal _mapRatio, _tileRatio;
+	bool _scalable;
+	int _scaledSize;
 
 	bool _valid;
 	QString _errorString;

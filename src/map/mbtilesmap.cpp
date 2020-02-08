@@ -4,6 +4,8 @@
 #include <QFileInfo>
 #include <QPainter>
 #include <QPixmapCache>
+#include <QImageReader>
+#include <QBuffer>
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #include <QtCore>
 #else // QT_VERSION < 5
@@ -15,26 +17,41 @@
 #include "mbtilesmap.h"
 
 
-struct MBTile
+class MBTile
 {
 public:
-	MBTile() {}
-	MBTile(const QPoint &xy) : xy(xy) {}
+	MBTile(int zoom, int scaledSize, const QPoint &xy, const QByteArray &data,
+	  const QString &key) : _zoom(zoom), _scaledSize(scaledSize), _xy(xy),
+	  _data(data), _key(key) {}
 
-	QPixmap pixmap;
-	QByteArray data;
-	QString key;
-	int zoom;
-	QPoint xy;
+	const QPoint &xy() const {return _xy;}
+	const QString &key() const {return _key;}
+	QPixmap pixmap() const {return QPixmap::fromImage(_image);}
+
+	void load() {
+		QByteArray z(QString::number(_zoom).toLatin1());
+
+		QBuffer buffer(&_data);
+		QImageReader reader(&buffer, z);
+		if (_scaledSize)
+			reader.setScaledSize(QSize(_scaledSize, _scaledSize));
+		reader.read(&_image);
+	}
+
+private:
+	int _zoom;
+	int _scaledSize;
+	QPoint _xy;
+	QByteArray _data;
+	QString _key;
+	QImage _image;
 };
 
 #define META_TYPE(type) static_cast<QMetaType::Type>(type)
 
 static void render(MBTile &tile)
 {
-	if (tile.pixmap.isNull())
-		tile.pixmap.loadFromData(tile.data, QString::number(tile.zoom)
-		  .toLatin1());
+	tile.load();
 }
 
 static double index2mercator(int index, int zoom)
@@ -43,11 +60,12 @@ static double index2mercator(int index, int zoom)
 }
 
 MBTilesMap::MBTilesMap(const QString &fileName, QObject *parent)
-  : Map(parent), _fileName(fileName), _deviceRatio(1.0), _tileRatio(1.0),
-  _valid(false)
+  : Map(parent), _fileName(fileName), _mapRatio(1.0), _tileRatio(1.0),
+  _scalable(false), _scaledSize(0), _valid(false)
 {
 	_db = QSqlDatabase::addDatabase("QSQLITE", fileName);
 	_db.setDatabaseName(fileName);
+	_db.setConnectOptions("QSQLITE_OPEN_READONLY");
 
 	if (!_db.open()) {
 		_errorString = fileName + ": Error opening database file";
@@ -110,12 +128,26 @@ MBTilesMap::MBTilesMap(const QString &fileName, QObject *parent)
 		QString sql = QString("SELECT tile_data FROM tiles LIMIT 1");
 		QSqlQuery query(sql, _db);
 		query.first();
-		QImage tile = QImage::fromData(query.value(0).toByteArray());
-		if (tile.isNull() || tile.size().width() != tile.size().height()) {
+
+		QByteArray data = query.value(0).toByteArray();
+		QBuffer buffer(&data);
+		QImageReader reader(&buffer);
+		QSize tileSize(reader.size());
+
+		if (!tileSize.isValid() || tileSize.width() != tileSize.height()) {
 			_errorString = "Unsupported/invalid tile images";
 			return;
 		}
-		_tileSize = tile.size().width();
+		_tileSize = tileSize.width();
+	}
+
+	{
+		QSqlQuery query("SELECT value FROM metadata WHERE name = 'format'", _db);
+		if (query.first()) {
+			if (query.value(0).toString() == "pbf")
+				_scalable = true;
+		} else
+			qWarning("%s: missing tiles format", qPrintable(_fileName));
 	}
 
 	{
@@ -202,14 +234,24 @@ int MBTilesMap::zoomOut()
 	return _zoom;
 }
 
+void MBTilesMap::setDevicePixelRatio(qreal deviceRatio, qreal mapRatio)
+{
+	_mapRatio = mapRatio;
+
+	if (_scalable) {
+		_scaledSize = _tileSize * deviceRatio;
+		_tileRatio = deviceRatio;
+	}
+}
+
 qreal MBTilesMap::coordinatesRatio() const
 {
-	return _deviceRatio > 1.0 ? _deviceRatio / _tileRatio : 1.0;
+	return _mapRatio > 1.0 ? _mapRatio / _tileRatio : 1.0;
 }
 
 qreal MBTilesMap::imageRatio() const
 {
-	return _deviceRatio > 1.0 ? _deviceRatio : _tileRatio;
+	return _mapRatio > 1.0 ? _mapRatio : _tileRatio;
 }
 
 qreal MBTilesMap::tileSize() const
@@ -250,21 +292,24 @@ void MBTilesMap::draw(QPainter *painter, const QRectF &rect, Flags flags)
 	int width = ceil(s.width() / tileSize());
 	int height = ceil(s.height() / tileSize());
 
-	QVector<MBTile> tiles;
-	tiles.reserve(width * height);
+
+	QList<MBTile> tiles;
 
 	for (int i = 0; i < width; i++) {
 		for (int j = 0; j < height; j++) {
+			QPixmap pm;
 			QPoint t(tile.x() + i, tile.y() + j);
 			QString key = _fileName + "-" + QString::number(_zoom) + "_"
 			  + QString::number(t.x()) + "_" + QString::number(t.y());
 
-			tiles.append(MBTile(t));
-			MBTile &mt = tiles.last();
-			if (!QPixmapCache::find(key, &(mt.pixmap))) {
-				mt.data = tileData(_zoom, t);
-				mt.key = key;
-				mt.zoom = _zoom;
+			if (QPixmapCache::find(key, pm)) {
+				QPointF tp(qMax(tl.x(), b.left()) + (t.x() - tile.x())
+				  * tileSize(), qMax(tl.y(), b.top()) + (t.y() - tile.y())
+				  * tileSize());
+				drawTile(painter, pm, tp);
+			} else {
+				tiles.append(MBTile(_zoom, _scaledSize, t, tileData(_zoom, t),
+				  key));
 			}
 		}
 	}
@@ -273,19 +318,26 @@ void MBTilesMap::draw(QPainter *painter, const QRectF &rect, Flags flags)
 	future.waitForFinished();
 
 	for (int i = 0; i < tiles.size(); i++) {
-		MBTile &mt = tiles[i];
-		if (!mt.pixmap.isNull() && !mt.data.isNull())
-			QPixmapCache::insert(mt.key, mt.pixmap);
+		const MBTile &mt = tiles.at(i);
+		QPixmap pm(mt.pixmap());
+		if (pm.isNull())
+			continue;
 
-		QPointF tp(qMax(tl.x(), b.left()) + (mt.xy.x() - tile.x()) * tileSize(),
-		  qMax(tl.y(), b.top()) + (mt.xy.y() - tile.y()) * tileSize());
-		if (!mt.pixmap.isNull()) {
-#ifdef ENABLE_HIDPI
-			mt.pixmap.setDevicePixelRatio(imageRatio());
-#endif // ENABLE_HIDPI
-			painter->drawPixmap(tp, mt.pixmap);
-		}
+		QPixmapCache::insert(mt.key(), pm);
+
+		QPointF tp(qMax(tl.x(), b.left()) + (mt.xy().x() - tile.x())
+		  * tileSize(), qMax(tl.y(), b.top()) + (mt.xy().y() - tile.y())
+		  * tileSize());
+		drawTile(painter, pm, tp);
 	}
+}
+
+void MBTilesMap::drawTile(QPainter *painter, QPixmap &pixmap, QPointF &tp)
+{
+#ifdef ENABLE_HIDPI
+	pixmap.setDevicePixelRatio(imageRatio());
+#endif // ENABLE_HIDPI
+	painter->drawPixmap(tp, pixmap);
 }
 
 QPointF MBTilesMap::ll2xy(const Coordinates &c)

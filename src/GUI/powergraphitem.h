@@ -8,16 +8,10 @@ class PowerGraphItem : public GraphItem
 	Q_OBJECT
 
 public:
-	PowerGraphItem(const Graph &graph, GraphType type,
-	  QGraphicsItem *parent = 0);
+	PowerGraphItem(const Graph &graph, GraphType type, int width,
+	  const QColor &color, QGraphicsItem *parent = 0);
 
-	qreal max() const {return _max;}
-	qreal avg() const {return _avg;}
-
-private:
-	QString toolTip() const;
-
-	qreal _avg, _max;
+	QString info() const;
 };
 
 #endif // POWERGRAPHITEM_H

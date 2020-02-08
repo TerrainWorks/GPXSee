@@ -21,7 +21,8 @@ private:
 		OSM,
 		WMTS,
 		WMS,
-		TMS
+		TMS,
+		QuadTiles
 	};
 
 	struct Config {
@@ -37,9 +38,11 @@ private:
 		QString crs;
 		CoordinateSystem coordinateSystem;
 		bool rest;
-		QList<KV> dimensions;
+		QList<KV<QString, QString> > dimensions;
 		Authorization authorization;
 		qreal tileRatio;
+		int tileSize;
+		bool scalable;
 
 		Config();
 	};
@@ -47,6 +50,7 @@ private:
 	static RectC bounds(QXmlStreamReader &reader);
 	static Range zooms(QXmlStreamReader &reader);
 	static void map(QXmlStreamReader &reader, Config &config);
+	static void tile(QXmlStreamReader &reader, Config &config);
 };
 
 #endif // MAPSOURCE_H

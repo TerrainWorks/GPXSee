@@ -38,6 +38,11 @@ void LOCParser::waypoint(Waypoint &waypoint)
 		} else if (_reader.name() == QLatin1String("coord")) {
 			waypoint.setCoordinates(coordinates());
 			_reader.skipCurrentElement();
+		} else if (_reader.name() == QLatin1String("link")) {
+			const QXmlStreamAttributes &attr = _reader.attributes();
+			QString URL(_reader.readElementText());
+			if (!URL.isEmpty())
+				waypoint.addLink(Link(URL, attr.value("text").toString()));
 		} else
 			_reader.skipCurrentElement();
 	}
@@ -46,7 +51,7 @@ void LOCParser::waypoint(Waypoint &waypoint)
 		_reader.raiseError("Missing waypoint coordinates");
 }
 
-void LOCParser::loc(QList<Waypoint> &waypoints)
+void LOCParser::loc(QVector<Waypoint> &waypoints)
 {
 	while (_reader.readNextStartElement()) {
 		if (_reader.name() == QLatin1String("waypoint")) {
@@ -58,10 +63,12 @@ void LOCParser::loc(QList<Waypoint> &waypoints)
 }
 
 bool LOCParser::parse(QFile *file, QList<TrackData> &tracks,
-  QList<RouteData> &routes, QList<Waypoint> &waypoints)
+  QList<RouteData> &routes, QList<Area> &polygons,
+  QVector<Waypoint> &waypoints)
 {
 	Q_UNUSED(tracks);
 	Q_UNUSED(routes);
+	Q_UNUSED(polygons);
 
 	_reader.clear();
 	_reader.setDevice(file);

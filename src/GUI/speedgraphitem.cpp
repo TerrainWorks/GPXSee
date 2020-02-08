@@ -4,26 +4,18 @@
 #include "speedgraphitem.h"
 
 
-SpeedGraphItem::SpeedGraphItem(const Graph &graph, GraphType type,
-  qreal movingTime, QGraphicsItem *parent) : GraphItem(graph, type, parent)
+SpeedGraphItem::SpeedGraphItem(const Graph &graph, GraphType type, int width,
+  const QColor &color, qreal movingTime, QGraphicsItem *parent)
+  : GraphItem(graph, type, width, color, parent)
 {
-	_units = Metric;
 	_timeType = Total;
 
-	_avg = graph.last().s() / graph.last().t();
-	_mavg = graph.last().s() / movingTime;
-
-	_max = graph.first().y();
-	for (int i = 1; i < graph.size(); i++) {
-		qreal y = graph.at(i).y();
-		if (y > _max)
-			_max = y;
-	}
-
-	setToolTip(toolTip());
+	_max = GraphItem::max();
+	_avg = graph.last().last().s() / graph.last().last().t();
+	_mavg = graph.last().last().s() / movingTime;
 }
 
-QString SpeedGraphItem::toolTip() const
+QString SpeedGraphItem::info() const
 {
 	ToolTip tt;
 	qreal scale = (_units == Imperial) ? MS2MIH : (_units == Nautical)
@@ -45,14 +37,7 @@ QString SpeedGraphItem::toolTip() const
 	return tt.toString();
 }
 
-void SpeedGraphItem::setUnits(Units units)
-{
-	_units = units;
-	setToolTip(toolTip());
-}
-
 void SpeedGraphItem::setTimeType(TimeType type)
 {
 	_timeType = type;
-	setToolTip(toolTip());
 }

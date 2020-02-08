@@ -14,6 +14,11 @@ PowerGraph::PowerGraph(QWidget *parent) : GraphTab(parent)
 	setSliderPrecision(1);
 }
 
+PowerGraph::~PowerGraph()
+{
+	qDeleteAll(_tracks);
+}
+
 void PowerGraph::setInfo()
 {
 	if (_showTracks) {
@@ -32,23 +37,31 @@ QList<GraphItem*> PowerGraph::loadData(const Data &data)
 	QList<GraphItem*> graphs;
 
 	for (int i = 0; i < data.tracks().count(); i++) {
-		const Graph &graph = data.tracks().at(i)->power();
+		const Track &track = data.tracks().at(i);
+		const Graph &graph = track.power();
 
-		if (graph.size() < 2) {
-			skipColor();
+		if (!graph.isValid()) {
+			_palette.nextColor();
 			graphs.append(0);
 		} else {
-			PowerGraphItem *gi = new PowerGraphItem(graph, _graphType);
-			GraphView::addGraph(gi);
-			_avg.append(QPointF(data.tracks().at(i)->distance(), gi->avg()));
+			PowerGraphItem *gi = new PowerGraphItem(graph, _graphType, _width,
+			  _palette.nextColor());
+
+			_tracks.append(gi);
+			if (_showTracks)
+				addGraph(gi);
+			_avg.append(QPointF(track.distance(), gi->avg()));
 			graphs.append(gi);
 		}
 	}
 
 	for (int i = 0; i < data.routes().count(); i++) {
-		skipColor();
+		_palette.nextColor();
 		graphs.append(0);
 	}
+
+	for (int i = 0; i < data.areas().count(); i++)
+		_palette.nextColor();
 
 	setInfo();
 	redraw();
@@ -59,11 +72,11 @@ QList<GraphItem*> PowerGraph::loadData(const Data &data)
 qreal PowerGraph::avg() const
 {
 	qreal sum = 0, w = 0;
-	QList<QPointF>::const_iterator it;
 
-	for (it = _avg.begin(); it != _avg.end(); it++) {
-		sum += it->y() * it->x();
-		w += it->x();
+	for (int i = 0; i < _avg.size(); i++) {
+		const QPointF &p = _avg.at(i);
+		sum += p.y() * p.x();
+		w += p.x();
 	}
 
 	return (sum / w);
@@ -71,16 +84,25 @@ qreal PowerGraph::avg() const
 
 void PowerGraph::clear()
 {
+	qDeleteAll(_tracks);
+	_tracks.clear();
+
 	_avg.clear();
 
-	GraphView::clear();
+	GraphTab::clear();
 }
 
 void PowerGraph::showTracks(bool show)
 {
 	_showTracks = show;
 
-	showGraph(show);
+	for (int i = 0; i < _tracks.size(); i++) {
+		if (show)
+			addGraph(_tracks.at(i));
+		else
+			removeGraph(_tracks.at(i));
+	}
+
 	setInfo();
 
 	redraw();

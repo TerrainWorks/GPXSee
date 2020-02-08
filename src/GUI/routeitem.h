@@ -5,8 +5,10 @@
 #include "pathitem.h"
 #include "units.h"
 #include "format.h"
+#include "graphicsscene.h"
 
 class Map;
+class WaypointItem;
 
 class RouteItem : public PathItem
 {
@@ -17,18 +19,20 @@ public:
 
 	void setMap(Map *map);
 
-	void setUnits(Units units);
+	void setUnits(Units u);
 	void setCoordinatesFormat(CoordinatesFormat format);
 	void showWaypoints(bool show);
 	void showWaypointLabels(bool show);
 
-private:
-	QString toolTip(Units units) const;
+	QString info() const;
 
+private:
 	QString _name;
 	QString _desc;
-	Units _units;
+	QVector<Link> _links;
 	CoordinatesFormat _coordinatesFormat;
+
+	QVector<WaypointItem*> _waypoints;
 };
 
 #endif // ROUTEITEM_H

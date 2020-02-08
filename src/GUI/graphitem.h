@@ -5,14 +5,18 @@
 #include <QPen>
 #include "data/graph.h"
 #include "units.h"
+#include "graphicsscene.h"
 
-class GraphItem : public QGraphicsObject
+class GraphItem : public QObject, public GraphicsItem
 {
 	Q_OBJECT
 
 public:
-	GraphItem(const Graph &graph, GraphType type, QGraphicsItem *parent = 0);
+	GraphItem(const Graph &graph, GraphType type, int width, const QColor &color,
+	  QGraphicsItem *parent = 0);
 	virtual ~GraphItem() {}
+
+	virtual QString info() const = 0;
 
 	QPainterPath shape() const {return _shape;}
 	QRectF boundingRect() const {return _shape.boundingRect();}
@@ -21,13 +25,15 @@ public:
 
 	const QRectF &bounds() const {return _bounds;}
 
+	qreal max() const;
+	qreal min() const;
+	qreal avg() const;
+
 	void setScale(qreal sx, qreal sy);
 	void setGraphType(GraphType type);
-	int id() const {return _id;}
-	void setId(int id) {_id = id;}
 	void setColor(const QColor &color);
 	void setWidth(int width);
-	virtual void setUnits(Units units) {Q_UNUSED(units);}
+	void setUnits(Units units) {_units = units;}
 
 	qreal yAtX(qreal x);
 	qreal distanceAtTime(qreal time);
@@ -42,26 +48,26 @@ public slots:
 	void emitSliderPositionChanged(qreal);
 	void hover(bool hover);
 
-private:
+protected:
 	void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
 	void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
+	void mousePressEvent(QGraphicsSceneMouseEvent *event);
 
+	Units _units;
+
+private:
+	const GraphSegment *segment(qreal x, GraphType type) const;
 	void updatePath();
 	void updateShape();
 	void updateBounds();
 
-	int _id;
-	QPen _pen;
-	int _width;
-
 	Graph _graph;
 	GraphType _type;
-
 	QPainterPath _path;
 	QPainterPath _shape;
 	QRectF _bounds;
 	qreal _sx, _sy;
-
+	QPen _pen;
 	bool _time;
 };
 

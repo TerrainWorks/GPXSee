@@ -4,6 +4,7 @@
 #include <QVector>
 #include <QSet>
 #include <QDateTime>
+#include <QDir>
 #include "trackdata.h"
 #include "graph.h"
 #include "path.h"
@@ -31,14 +32,16 @@ public:
 
 	const QString &name() const {return _data.name();}
 	const QString &description() const {return _data.description();}
+	const QVector<Link> &links() const {return _data.links();}
 
-	bool isNull() const {return (_data.size() < 2);}
+	bool isValid() const;
 
 	static void setElevationFilter(int window) {_elevationWindow = window;}
 	static void setSpeedFilter(int window) {_speedWindow = window;}
 	static void setHeartRateFilter(int window) {_heartRateWindow = window;}
 	static void setCadenceFilter(int window) {_cadenceWindow = window;}
 	static void setPowerFilter(int window) {_powerWindow = window;}
+	static void setAutomaticPause(bool set) {_automaticPause = set;}
 	static void setPauseSpeed(qreal speed) {_pauseSpeed = speed;}
 	static void setPauseInterval(int interval) {_pauseInterval = interval;}
 	static void setOutlierElimination(bool eliminate)
@@ -46,17 +49,18 @@ public:
 	static void useReportedSpeed(bool use) {_useReportedSpeed = use;}
 
 private:
-	bool discardStopPoint(int i) const;
+	struct Segment {
+		QVector<qreal> distance;
+		QVector<qreal> time;
+		QVector<qreal> speed;
+		QSet<int> outliers;
+		QSet<int> stop;
+	};
 
-	const TrackData &_data;
+	bool discardStopPoint(const Segment &seg, int i) const;
 
-	QVector<qreal> _distance;
-	QVector<qreal> _time;
-	QVector<qreal> _speed;
-
-	QSet<int> _outliers;
-	QSet<int> _stop;
-
+	TrackData _data;
+	QList<Segment> _segments;
 	qreal _pause;
 
 	static bool _outlierEliminate;
@@ -65,6 +69,7 @@ private:
 	static int _heartRateWindow;
 	static int _cadenceWindow;
 	static int _powerWindow;
+	static bool _automaticPause;
 	static qreal _pauseSpeed;
 	static int _pauseInterval;
 	static bool _useReportedSpeed;

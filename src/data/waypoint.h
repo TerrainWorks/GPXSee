@@ -4,9 +4,12 @@
 #include <QString>
 #include <QDateTime>
 #include <QHash>
+#include <QVector>
 #include <QDebug>
-#include <cmath>
 #include "common/coordinates.h"
+#include "imageinfo.h"
+#include "link.h"
+#include "address.h"
 
 class Waypoint
 {
@@ -18,6 +21,9 @@ public:
 	const Coordinates &coordinates() const {return _coordinates;}
 	const QString &name() const {return _name;}
 	const QString &description() const {return _description;}
+	const Address &address() const {return _address;}
+	const QVector<ImageInfo> &images() const {return _images;}
+	const QVector<Link> &links() const {return _links;}
 	const QDateTime &timestamp() const {return _timestamp;}
 	qreal elevation() const {return _elevation;}
 
@@ -26,8 +32,11 @@ public:
 	void setName(const QString &name) {_name = name;}
 	void setDescription(const QString &description)
 	  {_description = description;}
+	void setAddress(const Address &address) {_address = address;}
 	void setTimestamp(const QDateTime &timestamp) {_timestamp = timestamp;}
 	void setElevation(qreal elevation) {_elevation = elevation;}
+	void addImage(const ImageInfo &image) {_images.append(image);}
+	void addLink(const Link &link) {_links.append(link);}
 
 	bool hasElevation() const {return !std::isnan(_elevation);}
 
@@ -39,6 +48,9 @@ private:
 	Coordinates _coordinates;
 	QString _name;
 	QString _description;
+	Address _address;
+	QVector<ImageInfo> _images;
+	QVector<Link> _links;
 	QDateTime _timestamp;
 	qreal _elevation;
 };

@@ -58,7 +58,7 @@ public:
 	MessageDefinition defs[16];
 	qreal ratio;
 	Trackpoint trackpoint;
-	TrackData track;
+	SegmentData segment;
 };
 
 
@@ -87,13 +87,10 @@ template<class T> bool FITParser::readValue(CTX &ctx, T &val)
 
 	ctx.len -= sizeof(T);
 
-	if (sizeof(T) > 1) {
-		if (ctx.endian)
-			val = qFromBigEndian(data);
-		else
-			val = qFromLittleEndian(data);
-	} else
-		val = data;
+	if (ctx.endian)
+		val = qFromBigEndian(data);
+	else
+		val = qFromLittleEndian(data);
 
 	return true;
 }
@@ -268,6 +265,14 @@ bool FITParser::parseData(CTX &ctx, const MessageDefinition *def)
 					if (val != 0x7f)
 						ctx.trackpoint.setTemperature((qint8)val);
 					break;
+				case 73:
+					if (val != 0xffffffff)
+						ctx.trackpoint.setSpeed(val / 1000.0f);
+					break;
+				case 78:
+					if (val != 0xffffffff)
+						ctx.trackpoint.setElevation((val / 5.0) - 500);
+					break;
 				default:
 					break;
 
@@ -306,7 +311,7 @@ bool FITParser::parseData(CTX &ctx, const MessageDefinition *def)
 			ctx.trackpoint.setTimestamp(QDateTime::fromTime_t(ctx.timestamp
 			  + 631065600));
 			ctx.trackpoint.setRatio(ctx.ratio);
-			ctx.track.append(ctx.trackpoint);
+			ctx.segment.append(ctx.trackpoint);
 			ctx.trackpoint = Trackpoint();
 			ctx.lastWrite = ctx.timestamp;
 		}
@@ -372,10 +377,12 @@ bool FITParser::parseHeader(CTX &ctx)
 }
 
 bool FITParser::parse(QFile *file, QList<TrackData> &tracks,
-  QList<RouteData> &routes, QList<Waypoint> &waypoints)
+  QList<RouteData> &routes,
+  QList<Area> &polygons, QVector<Waypoint> &waypoints)
 {
 	Q_UNUSED(routes);
 	Q_UNUSED(waypoints);
+	Q_UNUSED(polygons);
 	CTX ctx(file);
 
 
@@ -386,7 +393,8 @@ bool FITParser::parse(QFile *file, QList<TrackData> &tracks,
 		if (!parseRecord(ctx))
 			return false;
 
-	tracks.append(ctx.track);
+	tracks.append(TrackData());
+	tracks.last().append(ctx.segment);
 
 	return true;
 }
