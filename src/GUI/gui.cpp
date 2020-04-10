@@ -51,6 +51,7 @@
 #include "graphtab.h"
 #include "graphitem.h"
 #include "pathitem.h"
+#include "mapaction.h"
 #include "gui.h"
 
 
@@ -58,7 +59,6 @@
 
 GUI::GUI()
 {
-	loadMaps();
 	loadPOIs();
 
 	createMapView();
@@ -106,24 +106,13 @@ GUI::GUI()
 	updateStatusBarInfo();
 }
 
-void GUI::loadMaps()
-{
-	_ml = new MapList(this);
-	QString mapDir(ProgramPaths::mapDir());
-
-	if (!mapDir.isNull() && !_ml->loadDir(mapDir))
-		qWarning("%s", qPrintable(_ml->errorString()));
-
-	_map = new EmptyMap(this);
-}
-
 void GUI::loadPOIs()
 {
 	_poi = new POI(this);
-	QString poiDir(ProgramPaths::poiDir());
 
-	if (!poiDir.isNull() && !_poi->loadDir(poiDir))
-		qWarning("%s", qPrintable(_poi->errorString()));
+	QString poiDir(ProgramPaths::poiDir());
+	if (!poiDir.isNull())
+		_poi->loadDir(poiDir);
 }
 
 void GUI::createBrowser()
@@ -134,40 +123,56 @@ void GUI::createBrowser()
 
 void GUI::createMapActions()
 {
-	_mapsSignalMapper = new QSignalMapper(this);
 	_mapsActionGroup = new QActionGroup(this);
 	_mapsActionGroup->setExclusive(true);
 
-	for (int i = 0; i < _ml->maps().count(); i++)
-		createMapAction(_ml->maps().at(i));
+	QString mapDir(ProgramPaths::mapDir());
+	if (mapDir.isNull())
+		return;
 
-	connect(_mapsSignalMapper, SIGNAL(mapped(int)), this,
-	  SLOT(mapChanged(int)));
+	QString unused;
+	QList<Map*> maps(MapList::loadMaps(mapDir, unused));
+	for (int i = 0; i < maps.count(); i++) {
+		MapAction *a = createMapAction(maps.at(i));
+		connect(a, SIGNAL(loaded()), this, SLOT(mapInitialized()));
+	}
 }
 
-QAction *GUI::createMapAction(const Map *map)
+MapAction *GUI::createMapAction(Map *map)
 {
-	QAction *a = new QAction(map->name(), this);
+	MapAction *a = new MapAction(map);
 	a->setMenuRole(QAction::NoRole);
 	a->setCheckable(true);
 	a->setActionGroup(_mapsActionGroup);
-
-	_mapActions.append(a);
-	_mapsSignalMapper->setMapping(a, _mapActions.size() - 1);
-	connect(a, SIGNAL(triggered()), _mapsSignalMapper, SLOT(map()));
+	connect(a, SIGNAL(triggered()), this, SLOT(mapChanged()));
 
 	return a;
+}
+
+void GUI::mapInitialized()
+{
+	MapAction *action = static_cast<MapAction*>(QObject::sender());
+	Map *map = action->data().value<Map*>();
+
+	if (map->isValid()) {
+		if (!_mapsActionGroup->checkedAction())
+			action->trigger();
+		_showMapAction->setEnabled(true);
+		_clearMapCacheAction->setEnabled(true);
+	} else {
+		qWarning("%s: %s", qPrintable(map->name()), qPrintable(map->errorString()));
+		action->deleteLater();
+	}
 }
 
 void GUI::createPOIFilesActions()
 {
 	_poiFilesSignalMapper = new QSignalMapper(this);
+	connect(_poiFilesSignalMapper, SIGNAL(mapped(int)), this,
+	  SLOT(poiFileChecked(int)));
 
 	for (int i = 0; i < _poi->files().count(); i++)
 		createPOIFileAction(_poi->files().at(i));
-
-	connect(_poiFilesSignalMapper, SIGNAL(mapped(int)), this,
-	  SLOT(poiFileChecked(int)));
 }
 
 QAction *GUI::createPOIFileAction(const QString &fileName)
@@ -281,8 +286,10 @@ void GUI::createActions()
 	createPOIFilesActions();
 
 	// Map actions
+	createMapActions();
 	_showMapAction = new QAction(QIcon(SHOW_MAP_ICON), tr("Show map"),
 	  this);
+	_showMapAction->setEnabled(false);
 	_showMapAction->setMenuRole(QAction::NoRole);
 	_showMapAction->setCheckable(true);
 	_showMapAction->setShortcut(SHOW_MAP_SHORTCUT);
@@ -294,10 +301,10 @@ void GUI::createActions()
 	_loadMapAction->setMenuRole(QAction::NoRole);
 	connect(_loadMapAction, SIGNAL(triggered()), this, SLOT(loadMap()));
 	_clearMapCacheAction = new QAction(tr("Clear tile cache"), this);
+	_clearMapCacheAction->setEnabled(false);
 	_clearMapCacheAction->setMenuRole(QAction::NoRole);
 	connect(_clearMapCacheAction, SIGNAL(triggered()), _mapView,
 	  SLOT(clearMapCache()));
-	createMapActions();
 	_nextMapAction = new QAction(tr("Next map"), this);
 	_nextMapAction->setMenuRole(QAction::NoRole);
 	_nextMapAction->setShortcut(NEXT_MAP_SHORTCUT);
@@ -308,10 +315,6 @@ void GUI::createActions()
 	_prevMapAction->setShortcut(PREV_MAP_SHORTCUT);
 	connect(_prevMapAction, SIGNAL(triggered()), this, SLOT(prevMap()));
 	addAction(_prevMapAction);
-	if (_ml->maps().isEmpty()) {
-		_showMapAction->setEnabled(false);
-		_clearMapCacheAction->setEnabled(false);
-	}
 	_showCoordinatesAction = new QAction(tr("Show cursor coordinates"), this);
 	_showCoordinatesAction->setMenuRole(QAction::NoRole);
 	_showCoordinatesAction->setCheckable(true);
@@ -506,7 +509,7 @@ void GUI::createMenus()
 #endif // Q_OS_MAC
 
 	_mapMenu = menuBar()->addMenu(tr("&Map"));
-	_mapMenu->addActions(_mapActions);
+	_mapMenu->addActions(_mapsActionGroup->actions());
 	_mapsEnd = _mapMenu->addSeparator();
 	_mapMenu->addAction(_loadMapAction);
 	_mapMenu->addAction(_clearMapCacheAction);
@@ -608,6 +611,7 @@ void GUI::createToolBars()
 
 void GUI::createMapView()
 {
+	_map = new EmptyMap(this);
 	_mapView = new MapView(_map, _poi, this);
 	_mapView->setSizePolicy(QSizePolicy(QSizePolicy::Ignored,
 	  QSizePolicy::Expanding));
@@ -905,9 +909,14 @@ void GUI::openOptions()
 		Track::action(options.option); \
 		reload = true; \
 	}
-#define SET_DATA_OPTION(option, action) \
+#define SET_ROUTE_OPTION(option, action) \
 	if (options.option != _options.option) { \
-		Data::action(options.option); \
+		Route::action(options.option); \
+		reload = true; \
+	}
+#define SET_WAYPOINT_OPTION(option, action) \
+	if (options.option != _options.option) { \
+		Waypoint::action(options.option); \
 		reload = true; \
 	}
 
@@ -953,13 +962,18 @@ void GUI::openOptions()
 	SET_TRACK_OPTION(pauseSpeed, setPauseSpeed);
 	SET_TRACK_OPTION(pauseInterval, setPauseInterval);
 	SET_TRACK_OPTION(useReportedSpeed, useReportedSpeed);
+	SET_TRACK_OPTION(dataUseDEM, useDEM);
+	SET_TRACK_OPTION(showSecondaryElevation, showSecondaryElevation);
+	SET_TRACK_OPTION(showSecondarySpeed, showSecondarySpeed);
 
-	SET_DATA_OPTION(dataUseDEM, useDEM);
+	SET_ROUTE_OPTION(dataUseDEM, useDEM);
+	SET_ROUTE_OPTION(showSecondaryElevation, showSecondaryElevation);
+
+	SET_WAYPOINT_OPTION(dataUseDEM, useDEM);
+	SET_WAYPOINT_OPTION(showSecondaryElevation, showSecondaryElevation);
 
 	if (options.poiRadius != _options.poiRadius)
 		_poi->setRadius(options.poiRadius);
-	if (options.poiUseDEM != _options.poiUseDEM)
-		_poi->useDEM(options.poiUseDEM);
 
 	if (options.pixmapCache != _options.pixmapCache)
 		QPixmapCache::setCacheLimit(options.pixmapCache * 1024);
@@ -1322,22 +1336,49 @@ void GUI::loadMap()
 
 bool GUI::loadMap(const QString &fileName)
 {
+	// On OS X fileName may be a directory!
+
 	if (fileName.isEmpty())
 		return false;
 
-	if (_ml->loadFile(fileName)) {
-		QAction *a = createMapAction(_ml->maps().last());
+	QString error;
+	QList<Map*> maps = MapList::loadMaps(fileName, error);
+	if (maps.isEmpty()) {
+		error = tr("Error loading map:") + "\n\n"
+		  + fileName + "\n\n" + error;
+		QMessageBox::critical(this, APP_NAME, error);
+		return false;
+	}
+
+	for (int i = 0; i < maps.size(); i++) {
+		Map *map = maps.at(i);
+		MapAction *a = createMapAction(map);
 		_mapMenu->insertAction(_mapsEnd, a);
+		if (map->isReady()) {
+			a->trigger();
+			_showMapAction->setEnabled(true);
+			_clearMapCacheAction->setEnabled(true);
+		} else
+			connect(a, SIGNAL(loaded()), this, SLOT(mapLoaded()));
+	}
+
+	return true;
+}
+
+void GUI::mapLoaded()
+{
+	MapAction *action = static_cast<MapAction*>(QObject::sender());
+	Map *map = action->data().value<Map*>();
+
+	if (map->isValid()) {
+		action->trigger();
 		_showMapAction->setEnabled(true);
 		_clearMapCacheAction->setEnabled(true);
-		a->trigger();
-		return true;
 	} else {
 		QString error = tr("Error loading map:") + "\n\n"
-		  + fileName + "\n\n" + _ml->errorString();
+		  + map->name() + "\n\n" + map->errorString();
 		QMessageBox::critical(this, APP_NAME, error);
-
-		return false;
+		action->deleteLater();
 	}
 }
 
@@ -1379,31 +1420,42 @@ void GUI::updateWindowTitle()
 		setWindowTitle(APP_NAME);
 }
 
-void GUI::mapChanged(int index)
+void GUI::mapChanged()
 {
-	_map = _ml->maps().at(index);
+	_map = _mapsActionGroup->checkedAction()->data().value<Map*>();
 	_mapView->setMap(_map);
 }
 
 void GUI::nextMap()
 {
-	if (_ml->maps().count() < 2)
+	QAction *checked = _mapsActionGroup->checkedAction();
+	if (!checked)
 		return;
 
-	int next = (_ml->maps().indexOf(_map) + 1) % _ml->maps().count();
-	_mapActions.at(next)->setChecked(true);
-	mapChanged(next);
+	QList<QAction*> maps = _mapsActionGroup->actions();
+	for (int i = 1;	i < maps.size(); i++) {
+		int next = (maps.indexOf(checked) + i) % maps.count();
+		if (maps.at(next)->isEnabled()) {
+			maps.at(next)->trigger();
+			break;
+		}
+	}
 }
 
 void GUI::prevMap()
 {
-	if (_ml->maps().count() < 2)
+	QAction *checked = _mapsActionGroup->checkedAction();
+	if (!checked)
 		return;
 
-	int prev = (_ml->maps().indexOf(_map) + _ml->maps().count() - 1)
-	  % _ml->maps().count();
-	_mapActions.at(prev)->setChecked(true);
-	mapChanged(prev);
+	QList<QAction*> maps = _mapsActionGroup->actions();
+	for (int i = 1; i < maps.size(); i++) {
+		int prev = (maps.indexOf(checked) + maps.count() - i) % maps.count();
+		if (maps.at(prev)->isEnabled()) {
+			maps.at(prev)->trigger();
+			break;
+		}
+	}
 }
 
 void GUI::poiFileChecked(int index)
@@ -1809,10 +1861,14 @@ void GUI::writeSettings()
 		settings.setValue(USE_REPORTED_SPEED_SETTING, _options.useReportedSpeed);
 	if (_options.dataUseDEM != DATA_USE_DEM_DEFAULT)
 		settings.setValue(DATA_USE_DEM_SETTING, _options.dataUseDEM);
+	if (_options.showSecondaryElevation != SHOW_SECONDARY_ELEVATION_DEFAULT)
+		settings.setValue(SHOW_SECONDARY_ELEVATION_SETTING,
+		  _options.showSecondaryElevation);
+	if (_options.showSecondarySpeed != SHOW_SECONDARY_SPEED_DEFAULT)
+		settings.setValue(SHOW_SECONDARY_SPEED_SETTING,
+		  _options.showSecondarySpeed);
 	if (_options.poiRadius != POI_RADIUS_DEFAULT)
 		settings.setValue(POI_RADIUS_SETTING, _options.poiRadius);
-	if (_options.poiUseDEM != POI_USE_DEM_DEFAULT)
-		settings.setValue(POI_USE_DEM_SETTING, _options.poiUseDEM);
 	if (_options.useOpenGL != USE_OPENGL_DEFAULT)
 		settings.setValue(USE_OPENGL_SETTING, _options.useOpenGL);
 #ifdef ENABLE_HTTP2
@@ -1896,9 +1952,11 @@ void GUI::readSettings()
 		_showMapAction->setChecked(true);
 	else
 		_mapView->showMap(false);
-	if (_ml->maps().count()) {
-		int index = mapIndex(settings.value(CURRENT_MAP_SETTING).toString());
-		_mapActions.at(index)->trigger();
+	QAction *ma = mapAction(settings.value(CURRENT_MAP_SETTING).toString());
+	if (ma) {
+		ma->trigger();
+		_showMapAction->setEnabled(true);
+		_clearMapCacheAction->setEnabled(true);
 	}
 	if (settings.value(SHOW_COORDINATES_SETTING, SHOW_COORDINATES_DEFAULT)
 	  .toBool()) {
@@ -2075,14 +2133,18 @@ void GUI::readSettings()
 	  USE_REPORTED_SPEED_DEFAULT).toBool();
 	_options.dataUseDEM = settings.value(DATA_USE_DEM_SETTING,
 	  DATA_USE_DEM_DEFAULT).toBool();
+	_options.showSecondaryElevation = settings.value(
+	  SHOW_SECONDARY_ELEVATION_SETTING,
+	  SHOW_SECONDARY_ELEVATION_DEFAULT).toBool();
+	_options.showSecondarySpeed = settings.value(
+	  SHOW_SECONDARY_SPEED_SETTING,
+	  SHOW_SECONDARY_SPEED_DEFAULT).toBool();
 	_options.automaticPause = settings.value(AUTOMATIC_PAUSE_SETTING,
 	  AUTOMATIC_PAUSE_DEFAULT).toBool();
 	_options.pauseInterval = settings.value(PAUSE_INTERVAL_SETTING,
 	  PAUSE_INTERVAL_DEFAULT).toInt();
 	_options.poiRadius = settings.value(POI_RADIUS_SETTING, POI_RADIUS_DEFAULT)
 	  .toInt();
-	_options.poiUseDEM = settings.value(POI_USE_DEM_SETTING,
-	  POI_USE_DEM_DEFAULT).toBool();
 	_options.useOpenGL = settings.value(USE_OPENGL_SETTING, USE_OPENGL_DEFAULT)
 	  .toBool();
 #ifdef ENABLE_HTTP2
@@ -2162,21 +2224,38 @@ void GUI::readSettings()
 	Track::setPauseSpeed(_options.pauseSpeed);
 	Track::setPauseInterval(_options.pauseInterval);
 	Track::useReportedSpeed(_options.useReportedSpeed);
-	Data::useDEM(_options.dataUseDEM);
+	Track::useDEM(_options.dataUseDEM);
+	Track::showSecondaryElevation(_options.showSecondaryElevation);
+	Track::showSecondarySpeed(_options.showSecondarySpeed);
+	Route::useDEM(_options.dataUseDEM);
+	Route::showSecondaryElevation(_options.showSecondaryElevation);
+	Waypoint::useDEM(_options.dataUseDEM);
+	Waypoint::showSecondaryElevation(_options.showSecondaryElevation);
 
 	_poi->setRadius(_options.poiRadius);
-	_poi->useDEM(_options.poiUseDEM);
 
 	QPixmapCache::setCacheLimit(_options.pixmapCache * 1024);
 
 	settings.endGroup();
 }
 
-int GUI::mapIndex(const QString &name)
+QAction *GUI::mapAction(const QString &name)
 {
-	for (int i = 0; i < _ml->maps().count(); i++)
-		if (_ml->maps().at(i)->name() == name)
-			return i;
+	QList<QAction *> maps = _mapsActionGroup->actions();
+
+	// Last map
+	for (int i = 0; i < maps.count(); i++) {
+		Map *map = maps.at(i)->data().value<Map*>();
+		if (map->name() == name && map->isReady())
+			return maps.at(i);
+	}
+
+	// Any usable map
+	for (int i = 0; i < maps.count(); i++) {
+		Map *map = maps.at(i)->data().value<Map*>();
+		if (map->isReady())
+			return maps.at(i);
+	}
 
 	return 0;
 }

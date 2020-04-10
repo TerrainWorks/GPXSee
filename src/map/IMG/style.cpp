@@ -1,4 +1,5 @@
 #include <QImage>
+#include <QPainter>
 #include "style.h"
 
 
@@ -59,7 +60,7 @@ void Style::defaultPolygonStyle()
 	_polygons[TYPE(0x4a)] = Polygon(QBrush("#f1f0e5"), QPen("#f1f0e5"));
 	_polygons[TYPE(0x4c)] = Polygon(QBrush("#9fc4e1", Qt::Dense6Pattern));
 	_polygons[TYPE(0x4d)] = Polygon(QBrush("#ddf1fd"));
-	_polygons[TYPE(0x4e)] = Polygon(QBrush("#e3edc1"));
+	_polygons[TYPE(0x4e)] = Polygon(QBrush("#f8f8f8"));
 	_polygons[TYPE(0x4f)] = Polygon(QBrush("#d4ebb8"));
 	_polygons[TYPE(0x50)] = Polygon(QBrush("#d4ebb8"));
 	_polygons[TYPE(0x51)] = Polygon(QBrush("#9fc4e1", Qt::Dense4Pattern));
@@ -79,13 +80,19 @@ void Style::defaultPolygonStyle()
 	  << TYPE(0x13);
 }
 
+static QImage railroad()
+{
+	QImage img(16, 4, QImage::Format_ARGB32_Premultiplied);
+	img.fill(QColor("#717171"));
+	QPainter p(&img);
+	p.setPen(QPen(Qt::white, 2));
+	p.drawLine(9, 2, 15, 2);
+
+	return img;
+}
+
 void Style::defaultLineStyle()
 {
-	QVector<qreal> pattern;
-	pattern << 4 << 4;
-	QPen rr(QColor("#717171"), 3, Qt::CustomDashLine);
-	rr.setDashPattern(pattern);
-
 	_lines[TYPE(0x01)] = Line(QPen(QColor("#9bd772"), 2, Qt::SolidLine),
 	  QPen(QColor("#72a35a"), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 	_lines[TYPE(0x02)] = Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
@@ -109,13 +116,13 @@ void Style::defaultLineStyle()
 	  QPen(QColor("#e8a541"), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 	_lines[TYPE(0x0c)] = Line(QPen(QColor("#ffffff"), 3, Qt::SolidLine),
 	  QPen(QColor("#d5cdc0"), 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x14)] = Line(rr, QPen(Qt::white, 3, Qt::SolidLine,
-	  Qt::RoundCap, Qt::RoundJoin));
+	_lines[TYPE(0x14)] = Line(railroad());
 	_lines[TYPE(0x16)] = Line(QPen(QColor("#aba083"), 1, Qt::DotLine));
 	_lines[TYPE(0x18)] = Line(QPen(QColor("#9fc4e1"), 2, Qt::SolidLine));
 	_lines[TYPE(0x18)].setTextColor(QColor("#9fc4e1"));
 	//_lines[TYPE(0x1a)] = Line(QPen(QColor("#7697b7"), 1, Qt::DashLine));
 	_lines[TYPE(0x1b)] = Line(QPen(QColor("#7697b7"), 1, Qt::DashLine));
+	_lines[TYPE(0x1c)] = Line(QPen(QColor("#505145"), 1, Qt::DashLine));
 	_lines[TYPE(0x1e)] = Line(QPen(QColor("#505145"), 2, Qt::DashDotLine));
 	_lines[TYPE(0x1f)] = Line(QPen(QColor("#9fc4e1"), 3, Qt::SolidLine));
 	_lines[TYPE(0x1f)].setTextColor(QColor("#9fc4e1"));
@@ -145,6 +152,17 @@ void Style::defaultLineStyle()
 
 void Style::defaultPointStyle()
 {
+	// Countries
+	_points[TYPE(0x14)].setTextColor(QColor("#505145"));
+	_points[TYPE(0x14)].setTextFontSize(Small);
+	_points[TYPE(0x15)].setTextColor(QColor("#505145"));
+	_points[TYPE(0x15)].setTextFontSize(Small);
+
+	// Regions
+	_points[TYPE(0x1e)].setTextColor(QColor("#505145"));
+	_points[TYPE(0x1e)].setTextFontSize(ExtraSmall);
+	_points[TYPE(0x28)].setTextFontSize(Small);
+
 	// Cities
 	_points[TYPE(0x01)].setTextFontSize(Large);
 	_points[TYPE(0x02)].setTextFontSize(Large);
@@ -341,7 +359,7 @@ static bool skipLocalization(SubFile *file, SubFile::Handle &hdl)
 		len = len >> 2;
 	}
 
-	if (!file->seek(hdl, hdl.pos + len))
+	if (!file->seek(hdl, hdl.pos() + len))
 		return false;
 
 	return true;
@@ -890,7 +908,7 @@ bool Style::parseDrawOrder(SubFile *file, SubFile::Handle &hdl,
 
 bool Style::parseTYPFile(SubFile *file)
 {
-	SubFile::Handle hdl;
+	SubFile::Handle hdl(file);
 	Section points, lines, polygons, order;
 	quint16 tmp16, codepage;
 

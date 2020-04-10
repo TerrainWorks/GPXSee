@@ -14,16 +14,20 @@ class TREFile : public SubFile
 {
 public:
 	TREFile(IMG *img) : SubFile(img) {}
+	TREFile(const QString &path) : SubFile(path) {}
 	TREFile(SubFile *gmp, quint32 offset) : SubFile(gmp, offset) {}
 	~TREFile();
 
 	bool init();
+	void markAsBasemap() {_isBaseMap = true;}
 	void clear();
 
 	const RectC &bounds() const {return _bounds;}
-	QList<SubDiv*> subdivs(const RectC &rect, int bits);
+	QList<SubDiv*> subdivs(const RectC &rect, int bits, bool baseMap);
 	quint32 shift(quint8 bits) const
 	  {return (bits == _levels.last().bits) ? (_flags >> 0xb) & 7 : 0;}
+	Range zooms() const
+	  {return Range(_levels.at(_firstLevel).bits, _levels.last().bits);}
 
 private:
 	struct MapLevel {
@@ -41,7 +45,7 @@ private:
 	typedef RTree<SubDiv*, double, 2> SubDivTree;
 
 	bool load(int idx);
-	int level(int bits);
+	int level(int bits, bool baseMap);
 	bool parsePoly(Handle hdl, quint32 pos, const QMap<int, int> &level2bits,
 	  QMap<quint32, int> &map);
 	bool parsePoints(Handle hdl, quint32 pos, const QMap<int, int> &level2bits);
@@ -54,6 +58,7 @@ private:
 	Extended _extended;
 	int _firstLevel;
 	quint32 _flags;
+	bool _isBaseMap;
 
 	QMap<int, SubDivTree*> _subdivs;
 };

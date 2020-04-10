@@ -12,8 +12,10 @@
 
 class QXmlStreamReader;
 
-class WMS
+class WMS : public QObject
 {
+	Q_OBJECT
+
 public:
 	class Setup
 	{
@@ -48,15 +50,25 @@ public:
 	};
 
 
-	WMS(const QString &path, const Setup &setup);
+	WMS(const QString &path, const Setup &setup, QObject *parent = 0);
 
+	const RectC &bbox() const {return _bbox;}
 	const Projection &projection() const {return _projection;}
+	CoordinateSystem cs() const {return _cs;}
 	const RangeF &scaleDenominator() const {return _scaleDenominator;}
-	const RectC &boundingBox() const {return _boundingBox;}
 	const QString &version() const {return _version;}
+	const QString &getMapUrl() const {return _getMapUrl;}
+	const WMS::Setup &setup() const {return _setup;}
 
+	bool isReady() const {return _valid && _ready;}
 	bool isValid() const {return _valid;}
 	const QString &errorString() const {return _errorString;}
+
+signals:
+	void downloadFinished();
+
+private slots:
+	void capabilitiesReady();
 
 private:
 	struct Layer {
@@ -79,12 +91,16 @@ private:
 		const Setup &setup;
 		QList<Layer> layers;
 		bool formatSupported;
+		QString url;
 
 		CTX(const Setup &setup);
 	};
 
 	RectC geographicBoundingBox(QXmlStreamReader &reader);
 	QString style(QXmlStreamReader &reader);
+	void get(QXmlStreamReader &reader, CTX &ctx);
+	void http(QXmlStreamReader &reader, CTX &ctx);
+	void dcpType(QXmlStreamReader &reader, CTX &ctx);
 	void getMap(QXmlStreamReader &reader, CTX &ctx);
 	void request(QXmlStreamReader &reader, CTX &ctx);
 	void layer(QXmlStreamReader &reader, CTX &ctx, const QList<QString> &pCRSs,
@@ -92,19 +108,21 @@ private:
 	  RectC &pBoundingBox);
 	void capability(QXmlStreamReader &reader, CTX &ctx);
 	void capabilities(QXmlStreamReader &reader, CTX &ctx);
-	bool parseCapabilities(const QString &path, const Setup &setup);
-	bool getCapabilities(const QString &url, const QString &file,
-	  const Authorization &authorization);
+	bool parseCapabilities();
+	bool downloadCapabilities(const QString &url);
 
+	WMS::Setup _setup;
+	QString _path;
+	Downloader *_downloader;
 	Projection _projection;
 	RangeF _scaleDenominator;
-	RectC _boundingBox;
+	RectC _bbox;
 	QString _version;
+	QString _getMapUrl;
+	CoordinateSystem _cs;
 
-	bool _valid;
+	bool _valid, _ready;
 	QString _errorString;
-
-	static Downloader *_downloader;
 };
 
 #endif // WMS_H

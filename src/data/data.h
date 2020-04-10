@@ -2,7 +2,7 @@
 #define DATA_H
 
 #include <QList>
-#include <QHash>
+#include <QMap>
 #include <QString>
 #include <QStringList>
 #include "waypoint.h"
@@ -14,7 +14,7 @@
 class Data
 {
 public:
-	Data(const QString &fileName, bool poi = false);
+	Data(const QString &fileName);
 
 	bool isValid() const {return _valid;}
 	const QString &errorString() const {return _errorString;}
@@ -28,8 +28,6 @@ public:
 	static QString formats();
 	static QStringList filter();
 
-	static void useDEM(bool use);
-
 private:
 	void processData(QList<TrackData> &trackData, QList<RouteData> &routeData);
 
@@ -42,8 +40,7 @@ private:
 	QList<Area> _polygons;
 	QVector<Waypoint> _waypoints;
 
-	static QHash<QString, Parser*> _parsers;
-	static bool _useDEM;
+	static QMap<QString, Parser*> _parsers;
 };
 
 #endif // DATA_H

@@ -20,7 +20,6 @@
 #include "cupparser.h"
 #include "gpiparser.h"
 #include "smlparser.h"
-#include "dem.h"
 #include "data.h"
 
 
@@ -44,78 +43,46 @@ static CUPParser cup;
 static GPIParser gpi;
 static SMLParser sml;
 
-static QHash<QString, Parser*> parsers()
+static QMap<QString, Parser*> parsers()
 {
-	QHash<QString, Parser*> hash;
+	QMap<QString, Parser*> map;
 
-	hash.insert("gpx", &gpx);
-	hash.insert("tcx", &tcx);
-	hash.insert("kml", &kml);
-	hash.insert("fit", &fit);
-	hash.insert("csv", &csv);
-	hash.insert("igc", &igc);
-	hash.insert("nmea", &nmea);
-	hash.insert("plt", &plt);
-	hash.insert("wpt", &wpt);
-	hash.insert("rte", &rte);
-	hash.insert("loc", &loc);
-	hash.insert("slf", &slf);
+	map.insert("gpx", &gpx);
+	map.insert("tcx", &tcx);
+	map.insert("kml", &kml);
+	map.insert("fit", &fit);
+	map.insert("csv", &csv);
+	map.insert("igc", &igc);
+	map.insert("nmea", &nmea);
+	map.insert("plt", &plt);
+	map.insert("wpt", &wpt);
+	map.insert("rte", &rte);
+	map.insert("loc", &loc);
+	map.insert("slf", &slf);
 #ifdef ENABLE_GEOJSON
-	hash.insert("json", &geojson);
-	hash.insert("geojson", &geojson);
+	map.insert("json", &geojson);
+	map.insert("geojson", &geojson);
 #endif // ENABLE_GEOJSON
-	hash.insert("jpeg", &exif);
-	hash.insert("jpg", &exif);
-	hash.insert("cup", &cup);
-	hash.insert("gpi", &gpi);
-	hash.insert("sml", &sml);
+	map.insert("jpeg", &exif);
+	map.insert("jpg", &exif);
+	map.insert("cup", &cup);
+	map.insert("gpi", &gpi);
+	map.insert("sml", &sml);
 
-	return hash;
+	return map;
 }
 
-
-QHash<QString, Parser*> Data::_parsers = parsers();
-bool Data::_useDEM = false;
+QMap<QString, Parser*> Data::_parsers = parsers();
 
 void Data::processData(QList<TrackData> &trackData, QList<RouteData> &routeData)
 {
-	for (int i = 0; i < trackData.count(); i++) {
-		TrackData &track = trackData[i];
-		for (int j = 0; j < track.size(); j++) {
-			SegmentData &segment = track[j];
-			for (int k = 0; k < segment.size(); k++) {
-				Trackpoint &t = segment[k];
-				if (!t.hasElevation() || _useDEM) {
-					qreal elevation = DEM::elevation(t.coordinates());
-					if (!std::isnan(elevation))
-						t.setElevation(elevation);
-				}
-			}
-		}
+	for (int i = 0; i < trackData.count(); i++)
 		_tracks.append(Track(trackData.at(i)));
-	}
-	for (int i = 0; i < routeData.count(); i++) {
-		RouteData &route = routeData[i];
-		for (int j = 0; j < route.size(); j++) {
-			Waypoint &w = route[j];
-			if (!w.hasElevation() || _useDEM) {
-				qreal elevation = DEM::elevation(w.coordinates());
-				if (!std::isnan(elevation))
-					w.setElevation(elevation);
-			}
-		}
+	for (int i = 0; i < routeData.count(); i++)
 		_routes.append(Route(routeData.at(i)));
-	}
-	for (int i = 0; i < _waypoints.size(); i++) {
-		if (!_waypoints.at(i).hasElevation() || _useDEM) {
-			qreal elevation = DEM::elevation(_waypoints.at(i).coordinates());
-			if (!std::isnan(elevation))
-				_waypoints[i].setElevation(elevation);
-		}
-	}
 }
 
-Data::Data(const QString &fileName, bool poi)
+Data::Data(const QString &fileName)
 {
 	QFile file(fileName);
 	QFileInfo fi(fileName);
@@ -130,12 +97,11 @@ Data::Data(const QString &fileName, bool poi)
 		return;
 	}
 
-	QHash<QString, Parser*>::iterator it;
+	QMap<QString, Parser*>::iterator it;
 	if ((it = _parsers.find(fi.suffix().toLower())) != _parsers.end()) {
 		if (it.value()->parse(&file, trackData, routeData, _polygons,
 		  _waypoints)) {
-			if (!poi)
-				processData(trackData, routeData);
+			processData(trackData, routeData);
 			_valid = true;
 			return;
 		} else {
@@ -146,8 +112,7 @@ Data::Data(const QString &fileName, bool poi)
 		for (it = _parsers.begin(); it != _parsers.end(); it++) {
 			if (it.value()->parse(&file, trackData, routeData, _polygons,
 			  _waypoints)) {
-				if (!poi)
-					processData(trackData, routeData);
+				processData(trackData, routeData);
 				_valid = true;
 				return;
 			}
@@ -166,17 +131,8 @@ Data::Data(const QString &fileName, bool poi)
 
 QString Data::formats()
 {
-	QStringList l(filter());
-	qSort(l);
-	QString supported;
-	for (int i = 0; i < l.size(); i++) {
-		supported += l.at(i);
-		if (i != l.size() - 1)
-			supported += " ";
-	}
-
 	return
-	  qApp->translate("Data", "Supported files") + " (" + supported + ");;"
+	  qApp->translate("Data", "Supported files") + " (" + filter().join(" ") + ");;"
 	  + qApp->translate("Data", "CSV files") + " (*.csv);;"
 	  + qApp->translate("Data", "CUP files") + " (*.cup);;"
 	  + qApp->translate("Data", "FIT files") + " (*.fit);;"
@@ -200,15 +156,10 @@ QString Data::formats()
 QStringList Data::filter()
 {
 	QStringList filter;
-	QHash<QString, Parser*>::iterator it;
 
-	for (it = _parsers.begin(); it != _parsers.end(); it++)
-		filter << QString("*.%1").arg(it.key());
+	for (QMap<QString, Parser*>::iterator it = _parsers.begin();
+	  it != _parsers.end(); it++)
+		filter << "*." + it.key();
 
 	return filter;
-}
-
-void Data::useDEM(bool use)
-{
-	_useDEM = use;
 }

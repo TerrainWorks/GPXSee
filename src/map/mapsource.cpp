@@ -222,6 +222,20 @@ void MapSource::map(QXmlStreamReader &reader, Config &config)
 	}
 }
 
+bool MapSource::isMap(const QString &path)
+{
+	QFile file(path);
+
+	if (!file.open(QFile::ReadOnly | QFile::Text))
+		return false;
+
+	QXmlStreamReader reader(&file);
+	if (reader.readNextStartElement() && reader.name() == "map")
+		return true;
+
+	return false;
+}
+
 Map *MapSource::loadMap(const QString &path, QString &errorString)
 {
 	Config config;
@@ -286,7 +300,7 @@ Map *MapSource::loadMap(const QString &path, QString &errorString)
 		case WMS:
 			return new WMSMap(config.name, WMS::Setup(config.url, config.layer,
 			  config.style, config.format, config.crs, config.coordinateSystem,
-			  config.dimensions, config.authorization));
+			  config.dimensions, config.authorization), config.tileSize);
 		case TMS:
 			return new OnlineMap(config.name, config.url, config.zooms,
 			  config.bounds, config.tileRatio, config.authorization,

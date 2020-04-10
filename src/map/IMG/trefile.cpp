@@ -3,6 +3,11 @@
 #include "trefile.h"
 
 
+static inline double RB(qint32 val)
+{
+	return (val == -0x800000 || val == 0x800000) ? 180.0 : toWGS24(val);
+}
+
 static void demangle(quint8 *data, quint32 size, quint32 key)
 {
 	static const unsigned char shuf[] = {
@@ -39,9 +44,10 @@ TREFile::~TREFile()
 
 bool TREFile::init()
 {
-	Handle hdl;
+	Handle hdl(this);
 	quint8 locked;
 	quint16 hdrLen;
+
 
 	if (!(seek(hdl, _gmpOffset) && readUInt16(hdl, hdrLen)
 	  && seek(hdl, _gmpOffset + 0x0D) && readUInt8(hdl, locked)))
@@ -53,7 +59,8 @@ bool TREFile::init()
 	  && readInt24(hdl, east) && readInt24(hdl, south) && readInt24(hdl, west)))
 		return false;
 	_bounds = RectC(Coordinates(toWGS24(west), toWGS24(north)),
-	  Coordinates(toWGS24(east), toWGS24(south)));
+	  Coordinates(RB(east), toWGS24(south)));
+	Q_ASSERT(_bounds.left() <= _bounds.right());
 
 	// Levels & subdivs info
 	quint32 levelsOffset, levelsSize, subdivSize;
@@ -108,12 +115,14 @@ bool TREFile::init()
 		}
 	}
 
+	_isBaseMap = false;
+
 	return (_firstLevel >= 0);
 }
 
 bool TREFile::load(int idx)
 {
-	Handle hdl;
+	Handle hdl(this);
 	QList<SubDiv*> sl;
 	SubDiv *s = 0;
 	SubDivTree *tree = new SubDivTree();
@@ -130,8 +139,8 @@ bool TREFile::load(int idx)
 
 	for (int j = 0; j < _levels.at(idx).subdivs; j++) {
 		quint32 oo;
-		qint32 lon, lat;
-		quint16 width, height, nextLevel;
+		qint32 lon, lat, width, height;
+		quint16 nextLevel;
 
 		if (!(readUInt32(hdl, oo) && readInt24(hdl, lon) && readInt24(hdl, lat)
 		  && readUInt16(hdl, width) && readUInt16(hdl, height)))
@@ -147,17 +156,16 @@ bool TREFile::load(int idx)
 			s->setEnd(offset);
 
 		width &= 0x7FFF;
-		width <<= (24 - _levels.at(idx).bits);
-		height <<= (24 - _levels.at(idx).bits);
-
+		width = LS(width, 24 - _levels.at(idx).bits);
+		height = LS(height, 24 - _levels.at(idx).bits);
 
 		s = new SubDiv(offset, lon, lat, _levels.at(idx).bits, objects);
 		sl.append(s);
 
 		double min[2], max[2];
-		RectC bounds(Coordinates(toWGS24(lon - width),
-		  toWGS24(lat + height + 1)), Coordinates(toWGS24(lon + width + 1),
-		  toWGS24(lat - height)));
+		RectC bounds(Coordinates(toWGS24(lon - width), toWGS24(lat + height)),
+		  Coordinates(RB(lon + width), toWGS24(lat - height)));
+		Q_ASSERT(bounds.left() <= bounds.right());
 
 		min[0] = bounds.left();
 		min[1] = bounds.bottom();
@@ -199,7 +207,7 @@ bool TREFile::load(int idx)
 			if (i)
 				sl.at(i-1)->setExtEnds(polygons, lines, points);
 
-			if (!seek(hdl, hdl.pos + _extended.itemSize - 12))
+			if (!seek(hdl, hdl.pos() + _extended.itemSize - 12))
 				goto error;
 		}
 
@@ -236,8 +244,15 @@ void TREFile::clear()
 	_subdivs.clear();
 }
 
-int TREFile::level(int bits)
+int TREFile::level(int bits, bool baseMap)
 {
+	if (baseMap) {
+		if (!_isBaseMap && _levels.first().bits > bits)
+			return -1;
+		if (_isBaseMap && bits > _levels.last().bits)
+			return -1;
+	}
+
 	int idx = _firstLevel;
 
 	for (int i = idx + 1; i < _levels.size(); i++) {
@@ -259,10 +274,10 @@ static bool cb(SubDiv *subdiv, void *context)
 	return true;
 }
 
-QList<SubDiv*> TREFile::subdivs(const RectC &rect, int bits)
+QList<SubDiv*> TREFile::subdivs(const RectC &rect, int bits, bool baseMap)
 {
 	QList<SubDiv*> list;
-	SubDivTree *tree = _subdivs.value(level(bits));
+	SubDivTree *tree = _subdivs.value(level(bits, baseMap));
 	double min[2], max[2];
 
 	min[0] = rect.left();

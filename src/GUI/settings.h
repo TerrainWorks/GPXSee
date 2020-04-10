@@ -145,10 +145,12 @@
 #define USE_REPORTED_SPEED_DEFAULT        false
 #define DATA_USE_DEM_SETTING              "dataUseDEM"
 #define DATA_USE_DEM_DEFAULT              false
+#define SHOW_SECONDARY_ELEVATION_SETTING  "showSecondaryElevation"
+#define SHOW_SECONDARY_ELEVATION_DEFAULT  false
+#define SHOW_SECONDARY_SPEED_SETTING      "showSecondarySpeed"
+#define SHOW_SECONDARY_SPEED_DEFAULT      false
 #define POI_RADIUS_SETTING                "poiRadius"
 #define POI_RADIUS_DEFAULT                (int)(IMPERIAL_UNITS() ? MIINM : KMINM)
-#define POI_USE_DEM_SETTING               "poiUseDEM"
-#define POI_USE_DEM_DEFAULT               false
 #define USE_OPENGL_SETTING                "useOpenGL"
 #define USE_OPENGL_DEFAULT                false
 #define ENABLE_HTTP2_SETTING              "enableHTTP2"

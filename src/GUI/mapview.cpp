@@ -2,7 +2,6 @@
 #include <QGraphicsScene>
 #include <QWheelEvent>
 #include <QApplication>
-#include <QPixmapCache>
 #include <QScrollBar>
 #include "data/poi.h"
 #include "data/data.h"
@@ -55,7 +54,7 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	_map = map;
 	_map->load();
 	_map->setProjection(_projection);
-	connect(_map, SIGNAL(loaded()), this, SLOT(reloadMap()));
+	connect(_map, SIGNAL(tilesLoaded()), this, SLOT(reloadMap()));
 
 	_poi = poi;
 	connect(_poi, SIGNAL(pointsChanged()), this, SLOT(updatePOI()));
@@ -317,7 +316,7 @@ void MapView::setMap(Map *map)
 	RectC cr(_map->xy2ll(vr.topLeft()), _map->xy2ll(vr.bottomRight()));
 
 	_map->unload();
-	disconnect(_map, SIGNAL(loaded()), this, SLOT(reloadMap()));
+	disconnect(_map, SIGNAL(tilesLoaded()), this, SLOT(reloadMap()));
 
 	_map = map;
 	_map->load();
@@ -325,7 +324,7 @@ void MapView::setMap(Map *map)
 #ifdef ENABLE_HIDPI
 	_map->setDevicePixelRatio(_deviceRatio, _mapRatio);
 #endif // ENABLE_HIDPI
-	connect(_map, SIGNAL(loaded()), this, SLOT(reloadMap()));
+	connect(_map, SIGNAL(tilesLoaded()), this, SLOT(reloadMap()));
 
 	digitalZoom(0);
 
@@ -351,7 +350,6 @@ void MapView::setMap(Map *map)
 	centerOn(nc);
 
 	reloadMap();
-	QPixmapCache::clear();
 }
 
 void MapView::setPOI(POI *poi)
@@ -453,10 +451,7 @@ void MapView::setCoordinatesFormat(CoordinatesFormat format)
 void MapView::clearMapCache()
 {
 	_map->clearCache();
-
-	fitMapZoom();
-	rescale();
-	centerOn(contentCenter());
+	reloadMap();
 }
 
 void MapView::digitalZoom(int zoom)
@@ -982,7 +977,6 @@ void MapView::setDevicePixelRatio(qreal deviceRatio, qreal mapRatio)
 
 	_deviceRatio = deviceRatio;
 	_mapRatio = mapRatio;
-	QPixmapCache::clear();
 
 	QRectF vr(mapToScene(viewport()->rect()).boundingRect()
 	  .intersected(_map->bounds()));

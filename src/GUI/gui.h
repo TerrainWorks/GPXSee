@@ -26,9 +26,9 @@ class FileBrowser;
 class GraphTab;
 class MapView;
 class Map;
-class MapList;
 class POI;
 class QScreen;
+class MapAction;
 
 class GUI : public QMainWindow
 {
@@ -64,7 +64,7 @@ private slots:
 	void prevMap();
 	void openOptions();
 
-	void mapChanged(int);
+	void mapChanged();
 	void graphChanged(int);
 	void poiFileChecked(int);
 
@@ -88,16 +88,18 @@ private slots:
 	void screenChanged(QScreen *screen);
 	void logicalDotsPerInchChanged(qreal dpi);
 
+	void mapLoaded();
+	void mapInitialized();
+
 private:
 	typedef QPair<QDate, QDate> DateRange;
 
-	void loadMaps();
 	void loadPOIs();
 	void closeFiles();
 	void plot(QPrinter *printer);
 
 	QAction *createPOIFileAction(const QString &fileName);
-	QAction *createMapAction(const Map *map);
+	MapAction *createMapAction(Map *map);
 	void createPOIFilesActions();
 	void createMapActions();
 	void createActions();
@@ -127,7 +129,7 @@ private:
 	qreal distance() const;
 	qreal time() const;
 	qreal movingTime() const;
-	int mapIndex(const QString &name);
+	QAction *mapAction(const QString &name);
 	void readSettings();
 	void writeSettings();
 
@@ -196,11 +198,9 @@ private:
 	QAction *_showCoordinatesAction;
 	QAction *_openOptionsAction;
 	QAction *_mapsEnd;
-	QList<QAction*> _mapActions;
-	QList<QAction*> _poiFilesActions;
 
+	QList<QAction*> _poiFilesActions;
 	QSignalMapper *_poiFilesSignalMapper;
-	QSignalMapper *_mapsSignalMapper;
 
 	QLabel *_fileNameLabel;
 	QLabel *_distanceLabel;
@@ -212,7 +212,6 @@ private:
 	QList<GraphTab*> _tabs;
 
 	POI *_poi;
-	MapList *_ml;
 	Map *_map;
 
 	FileBrowser *_browser;

@@ -1,3 +1,4 @@
+#include <QSet>
 #include <QGraphicsScene>
 #include <QEvent>
 #include <QMouseEvent>
@@ -274,8 +275,8 @@ void GraphView::redraw(const QSizeF &size)
 	rx = RangeF(bounds().left() * _xScale, bounds().right() * _xScale);
 	ry = RangeF(bounds().top() * _yScale + _yOffset, bounds().bottom() * _yScale
 	  + _yOffset);
-	if (ry.size() < _minYRange)
-		ry.resize(_minYRange);
+	if (ry.size() < _minYRange * _yScale)
+		ry.resize(_minYRange * _yScale);
 
 	_xAxis->setRange(rx);
 	_yAxis->setRange(ry);
@@ -419,14 +420,16 @@ void GraphView::updateSliderInfo()
 {
 	QLocale l(QLocale::system());
 	qreal r = 0, y = 0;
+	GraphItem *cardinal = (_graphs.count() == 1 || (_graphs.count() == 2
+	  && _graphs.first()->secondaryGraph())) ? _graphs.first() : 0;
 
-	if (_graphs.count() == 1) {
-		QRectF br(_graphs.first()->bounds());
+	if (cardinal) {
+		QRectF br(_bounds);
 		if (br.height() < _minYRange)
 			br.adjust(0, -(_minYRange/2 - br.height()/2), 0,
 			  _minYRange/2 - br.height()/2);
 
-		y = _graphs.first()->yAtX(_sliderPos);
+		y = cardinal->yAtX(_sliderPos);
 		r = (y - br.bottom()) / br.height();
 	}
 
@@ -436,11 +439,17 @@ void GraphView::updateSliderInfo()
 
 	_sliderInfo->setSide(s);
 	_sliderInfo->setPos(QPointF(0, _slider->boundingRect().height() * r));
-	_sliderInfo->setText(_graphType == Time ? Format::timeSpan(_sliderPos,
+	QString xText(_graphType == Time ? Format::timeSpan(_sliderPos,
 	  bounds().width() > 3600) : l.toString(_sliderPos * _xScale, 'f', 1)
-	  + UNIT_SPACE + _xUnits, (_graphs.count() > 1) ? QString()
-	  : l.toString(-y * _yScale + _yOffset, 'f', _precision) + UNIT_SPACE
-	  + _yUnits);
+	  + UNIT_SPACE + _xUnits);
+	QString yText((!cardinal) ? QString() : l.toString(-y * _yScale + _yOffset,
+	  'f', _precision) + UNIT_SPACE + _yUnits);
+	if (cardinal && cardinal->secondaryGraph()) {
+		qreal delta = y - cardinal->secondaryGraph()->yAtX(_sliderPos);
+		yText += " " + QChar(0x0394) + l.toString(-delta * _yScale + _yOffset,
+		  'f', _precision) + UNIT_SPACE + _yUnits;
+	}
+	_sliderInfo->setText(xText, yText);
 }
 
 void GraphView::emitSliderPositionChanged(const QPointF &pos)
@@ -486,8 +495,23 @@ void GraphView::setPalette(const Palette &palette)
 	_palette = palette;
 	_palette.reset();
 
-	for (int i = 0; i < _graphs.count(); i++)
-		_graphs.at(i)->setColor(_palette.nextColor());
+	QSet<GraphItem*> secondary;
+	for (int i = 0; i < _graphs.count(); i++) {
+		GraphItem *g = _graphs[i];
+		if (g->secondaryGraph())
+			secondary.insert(g->secondaryGraph());
+	}
+
+	for (int i = 0; i < _graphs.count(); i++) {
+		GraphItem *g = _graphs[i];
+		if (secondary.contains(g))
+			continue;
+
+		QColor color(_palette.nextColor());
+		g->setColor(color);
+		if (g->secondaryGraph())
+			g->secondaryGraph()->setColor(color);
+	}
 }
 
 void GraphView::setGraphWidth(int width)

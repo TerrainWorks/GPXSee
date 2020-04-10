@@ -10,114 +10,98 @@
 
 
 #define CAPABILITIES_FILE "capabilities.xml"
-#define TILE_SIZE 256
 #define EPSILON 1e-6
 
 double WMSMap::sd2res(double scaleDenominator) const
 {
-	return scaleDenominator * 0.28e-3 * _projection.units().fromMeters(1.0);
+	return scaleDenominator * _wms->projection().units().fromMeters(1.0)
+	 * 0.28e-3;
 }
 
-QString WMSMap::tileUrl(const QString &version) const
+QString WMSMap::tileUrl() const
 {
-	QString url;
+	const WMS::Setup &setup = _wms->setup();
 
-	url = QString("%1%2version=%3&request=GetMap&bbox=$bbox"
+	QString url = QString("%1%2service=WMS&version=%3&request=GetMap&bbox=$bbox"
 	  "&width=%4&height=%5&layers=%6&styles=%7&format=%8&transparent=true")
-	  .arg(_setup.url(), _setup.url().contains('?') ? "&" : "?", version,
-	  QString::number(TILE_SIZE), QString::number(TILE_SIZE), _setup.layer(),
-	  _setup.style(), _setup.format());
+	  .arg(_wms->getMapUrl(), _wms->getMapUrl().contains('?') ? "&" : "?",
+	  _wms->version(), QString::number(_tileSize), QString::number(_tileSize),
+	  setup.layer(), setup.style(), setup.format());
 
-	if (version >= "1.3.0")
-		url.append(QString("&CRS=%1").arg(_setup.crs()));
+	if (_wms->version() >= "1.3.0")
+		url.append(QString("&CRS=%1").arg(setup.crs()));
 	else
-		url.append(QString("&SRS=%1").arg(_setup.crs()));
+		url.append(QString("&SRS=%1").arg(setup.crs()));
 
-	for (int i = 0; i < _setup.dimensions().size(); i++) {
-		const KV<QString, QString> &dim = _setup.dimensions().at(i);
+	for (int i = 0; i < setup.dimensions().size(); i++) {
+		const KV<QString, QString> &dim = setup.dimensions().at(i);
 		url.append(QString("&%1=%2").arg(dim.key(), dim.value()));
 	}
 
 	return url;
 }
 
-QString WMSMap::tilesDir() const
-{
-	return QString(QDir(ProgramPaths::tilesDir()).filePath(_name));
-}
-
-void WMSMap::computeZooms(const RangeF &scaleDenominator)
+void WMSMap::computeZooms()
 {
 	_zooms.clear();
 
-	if (scaleDenominator.size() > 0) {
-		double ld = log2(scaleDenominator.max() - EPSILON)
-		  - log2(scaleDenominator.min() + EPSILON);
+	const RangeF &sd = _wms->scaleDenominator();
+	if (sd.size() > 0) {
+		double ld = log2(sd.max() - EPSILON) - log2(sd.min() + EPSILON);
 		int cld = (int)ceil(ld);
 		double step = ld / (double)cld;
-		double lmax = log2(scaleDenominator.max() - EPSILON);
+		double lmax = log2(sd.max() - EPSILON);
 		for (int i = 0; i <= cld; i++)
 			_zooms.append(pow(2.0, lmax - i * step));
 	} else
-		_zooms.append(scaleDenominator.min() + EPSILON);
+		_zooms.append(sd.min() + EPSILON);
 }
 
 void WMSMap::updateTransform()
 {
 	double pixelSpan = sd2res(_zooms.at(_zoom));
-	if (_projection.isGeographic())
+	if (_wms->projection().isGeographic())
 		pixelSpan /= deg2rad(WGS84_RADIUS);
 	_transform = Transform(ReferencePoint(PointD(0, 0),
-	  _projection.ll2xy(_bbox.topLeft())), PointD(pixelSpan, pixelSpan));
+	  _wms->projection().ll2xy(_wms->bbox().topLeft())),
+	  PointD(pixelSpan, pixelSpan));
 }
 
-bool WMSMap::loadWMS()
+WMSMap::WMSMap(const QString &name, const WMS::Setup &setup, int tileSize,
+  QObject *parent) : Map(parent), _name(name), _tileLoader(0), _zoom(0),
+  _tileSize(tileSize), _mapRatio(1.0)
 {
-	QString file = tilesDir() + "/" + CAPABILITIES_FILE;
+	QString tilesDir(QDir(ProgramPaths::tilesDir()).filePath(_name));
 
-	WMS wms(file, _setup);
-	if (!wms.isValid()) {
-		_errorString = wms.errorString();
-		return false;
-	}
+	_tileLoader = new TileLoader(tilesDir, this);
+	_tileLoader->setAuthorization(setup.authorization());
+	connect(_tileLoader, SIGNAL(finished()), this, SIGNAL(tilesLoaded()));
 
-	_projection = wms.projection();
-	_bbox = wms.boundingBox();
-	_bounds = RectD(_bbox, _projection);
-	_tileLoader->setUrl(tileUrl(wms.version()));
+	_wms = new WMS(QDir(tilesDir).filePath(CAPABILITIES_FILE), setup, this);
+	connect(_wms, SIGNAL(downloadFinished()), this, SLOT(wmsReady()));
+	if (_wms->isReady())
+		init();
+}
 
-	if (wms.version() >= "1.3.0") {
-		if (_setup.coordinateSystem().axisOrder() == CoordinateSystem::Unknown)
-			_cs = _projection.coordinateSystem();
-		else
-			_cs = _setup.coordinateSystem();
-	} else
-		_cs = CoordinateSystem::XY;
-
-	computeZooms(wms.scaleDenominator());
+void WMSMap::init()
+{
+	_tileLoader->setUrl(tileUrl());
+	_bounds = RectD(_wms->bbox(), _wms->projection());
+	computeZooms();
 	updateTransform();
-
-	return true;
 }
 
-WMSMap::WMSMap(const QString &name, const WMS::Setup &setup, QObject *parent)
-  : Map(parent), _name(name), _setup(setup), _tileLoader(0), _zoom(0),
-  _mapRatio(1.0), _valid(false)
+void WMSMap::wmsReady()
 {
-	_tileLoader = new TileLoader(tilesDir(), this);
-	_tileLoader->setAuthorization(_setup.authorization());
-	connect(_tileLoader, SIGNAL(finished()), this, SIGNAL(loaded()));
+	if (_wms->isValid())
+		init();
 
-	_valid = loadWMS();
+	emit mapLoaded();
 }
 
 void WMSMap::clearCache()
 {
 	_tileLoader->clearCache();
-	_zoom = 0;
-
-	if (!loadWMS())
-		qWarning("%s: %s", qPrintable(_name), qPrintable(_errorString));
 }
 
 QRectF WMSMap::bounds()
@@ -129,10 +113,10 @@ QRectF WMSMap::bounds()
 int WMSMap::zoomFit(const QSize &size, const RectC &rect)
 {
 	if (rect.isValid()) {
-		RectD prect(rect, _projection);
+		RectD prect(rect, _wms->projection());
 		PointD sc(prect.width() / size.width(), prect.height() / size.height());
 		double resolution = qMax(qAbs(sc.x()), qAbs(sc.y()));
-		if (_projection.isGeographic())
+		if (_wms->projection().isGeographic())
 			resolution *= deg2rad(WGS84_RADIUS);
 
 		_zoom = 0;
@@ -170,17 +154,17 @@ int WMSMap::zoomOut()
 
 QPointF WMSMap::ll2xy(const Coordinates &c)
 {
-	return _transform.proj2img(_projection.ll2xy(c)) / _mapRatio;
+	return _transform.proj2img(_wms->projection().ll2xy(c)) / _mapRatio;
 }
 
 Coordinates WMSMap::xy2ll(const QPointF &p)
 {
-	return _projection.xy2ll(_transform.img2proj(p * _mapRatio));
+	return _wms->projection().xy2ll(_transform.img2proj(p * _mapRatio));
 }
 
 qreal WMSMap::tileSize() const
 {
-	return (TILE_SIZE / _mapRatio);
+	return (_tileSize / _mapRatio);
 }
 
 void WMSMap::draw(QPainter *painter, const QRectF &rect, Flags flags)
@@ -194,11 +178,11 @@ void WMSMap::draw(QPainter *painter, const QRectF &rect, Flags flags)
 	tiles.reserve((br.x() - tl.x()) * (br.y() - tl.y()));
 	for (int i = tl.x(); i < br.x(); i++) {
 		for (int j = tl.y(); j < br.y(); j++) {
-			PointD ttl(_transform.img2proj(QPointF(i * TILE_SIZE,
-			  j * TILE_SIZE)));
-			PointD tbr(_transform.img2proj(QPointF(i * TILE_SIZE + TILE_SIZE,
-			  j * TILE_SIZE + TILE_SIZE)));
-			RectD bbox = (_cs.axisOrder() == CoordinateSystem::YX)
+			PointD ttl(_transform.img2proj(QPointF(i * _tileSize,
+			  j * _tileSize)));
+			PointD tbr(_transform.img2proj(QPointF(i * _tileSize + _tileSize,
+			  j * _tileSize + _tileSize)));
+			RectD bbox = (_wms->cs().axisOrder() == CoordinateSystem::YX)
 			  ? RectD(PointD(tbr.y(), tbr.x()), PointD(ttl.y(), ttl.x()))
 			  : RectD(ttl, tbr);
 
