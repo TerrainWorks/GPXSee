@@ -3,30 +3,32 @@ unix:!macx {
 } else {
     TARGET = GPXSee
 }
-VERSION = 7.28
+VERSION = 8.1
 
 QT += core \
     gui \
+    gui-private \
     network \
     sql \
-    concurrent
-greaterThan(QT_MAJOR_VERSION, 4) {
-    QT += widgets
-    QT += printsupport
-}
-lessThan(QT_MAJOR_VERSION, 5) {QT += opengl}
-equals(QT_MAJOR_VERSION, 5) : lessThan(QT_MINOR_VERSION, 4) {QT += opengl}
+    concurrent \
+    widgets \
+    printsupport
+greaterThan(QT_MAJOR_VERSION, 5) {QT += openglwidgets}
 
 INCLUDEPATH += ./src
 HEADERS += src/common/config.h \
+    src/GUI/axislabelitem.h \
     src/GUI/graphicsscene.h \
     src/GUI/mapaction.h \
+    src/GUI/mapitem.h \
+    src/GUI/marginswidget.h \
+    src/GUI/planeitem.h \
     src/GUI/popup.h \
     src/common/garmin.h \
-    src/common/staticassert.h \
     src/common/coordinates.h \
     src/common/range.h \
     src/common/rectc.h \
+    src/common/textcodec.h \
     src/common/wgs84.h \
     src/common/util.h \
     src/common/rtree.h \
@@ -53,9 +55,7 @@ HEADERS += src/common/config.h \
     src/GUI/palette.h \
     src/GUI/heartrategraph.h \
     src/GUI/trackinfo.h \
-    src/GUI/exportdialog.h \
     src/GUI/fileselectwidget.h \
-    src/GUI/margins.h \
     src/GUI/temperaturegraph.h \
     src/GUI/graphtab.h \
     src/GUI/trackitem.h \
@@ -71,7 +71,6 @@ HEADERS += src/common/config.h \
     src/GUI/optionsdialog.h \
     src/GUI/colorbox.h \
     src/GUI/stylecombobox.h \
-    src/GUI/opengl.h \
     src/GUI/timetype.h \
     src/GUI/percentslider.h \
     src/GUI/elevationgraphitem.h \
@@ -83,7 +82,6 @@ HEADERS += src/common/config.h \
     src/GUI/gearratiographitem.h \
     src/GUI/oddspinbox.h \
     src/GUI/settings.h \
-    src/GUI/cpuarch.h \
     src/GUI/searchpointer.h \
     src/GUI/mapview.h \
     src/GUI/font.h \
@@ -93,11 +91,19 @@ HEADERS += src/common/config.h \
     src/map/IMG/bitstream.h \
     src/map/IMG/deltastream.h \
     src/map/IMG/gmap.h \
+    src/map/IMG/huffmanbuffer.h \
     src/map/IMG/huffmanstream.h \
     src/map/IMG/huffmantable.h \
+    src/map/IMG/huffmantext.h \
+    src/map/IMG/nodfile.h \
     src/map/IMG/mapdata.h \
+    src/map/IMG/rastertile.h \
     src/map/IMG/textpathitem.h \
     src/map/IMG/textpointitem.h \
+    src/map/bsbmap.h \
+    src/map/invalidmap.h \
+    src/map/kmzmap.h \
+    src/map/polyconic.h \
     src/map/projection.h \
     src/map/ellipsoid.h \
     src/map/datum.h \
@@ -196,12 +202,21 @@ HEADERS += src/common/config.h \
     src/data/cupparser.h \
     src/data/gpiparser.h \
     src/data/address.h \
-    src/data/smlparser.h
+    src/data/smlparser.h \
+    src/GUI/pdfexportdialog.h \
+    src/GUI/pngexportdialog.h \
+    src/data/geojsonparser.h \
+    src/GUI/timezoneinfo.h
+
 SOURCES += src/main.cpp \
+    src/GUI/axislabelitem.cpp \
+    src/GUI/mapitem.cpp \
+    src/GUI/marginswidget.cpp \
     src/GUI/popup.cpp \
     src/common/coordinates.cpp \
     src/common/rectc.cpp \
     src/common/range.cpp \
+    src/common/textcodec.cpp \
     src/common/util.cpp \
     src/common/greatcircle.cpp \
     src/common/programpaths.cpp \
@@ -222,7 +237,6 @@ SOURCES += src/main.cpp \
     src/GUI/palette.cpp \
     src/GUI/heartrategraph.cpp \
     src/GUI/trackinfo.cpp \
-    src/GUI/exportdialog.cpp \
     src/GUI/fileselectwidget.cpp \
     src/GUI/temperaturegraph.cpp \
     src/GUI/trackitem.cpp \
@@ -254,16 +268,23 @@ SOURCES += src/main.cpp \
     src/map/IMG/bitstream.cpp \
     src/map/IMG/deltastream.cpp \
     src/map/IMG/gmap.cpp \
+    src/map/IMG/huffmanbuffer.cpp \
     src/map/IMG/huffmanstream.cpp \
     src/map/IMG/huffmantable.cpp \
+    src/map/IMG/huffmantext.cpp \
+    src/map/IMG/nodfile.cpp \
     src/map/IMG/mapdata.cpp \
+    src/map/IMG/rastertile.cpp \
     src/map/IMG/textpathitem.cpp \
     src/map/IMG/textpointitem.cpp \
+    src/map/bsbmap.cpp \
+    src/map/kmzmap.cpp \
     src/map/maplist.cpp \
     src/map/onlinemap.cpp \
     src/map/downloader.cpp \
     src/map/emptymap.cpp \
     src/map/ozimap.cpp \
+    src/map/polyconic.cpp \
     src/map/tar.cpp \
     src/map/atlas.cpp \
     src/map/ozf.cpp \
@@ -340,16 +361,13 @@ SOURCES += src/main.cpp \
     src/data/cupparser.cpp \
     src/GUI/graphicsscene.cpp \
     src/data/gpiparser.cpp \
-    src/data/smlparser.cpp
-
-greaterThan(QT_MAJOR_VERSION, 4) {
-    HEADERS += src/data/geojsonparser.h
-    SOURCES += src/data/geojsonparser.cpp
-}
+    src/data/smlparser.cpp \
+    src/GUI/pdfexportdialog.cpp \
+    src/GUI/pngexportdialog.cpp \
+    src/data/geojsonparser.cpp
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\" \
     QT_NO_DEPRECATED_WARNINGS
-DEFINES *= QT_USE_QSTRINGBUILDER
 
 RESOURCES += gpxsee.qrc
 TRANSLATIONS = lang/gpxsee_en.ts \
@@ -366,10 +384,12 @@ TRANSLATIONS = lang/gpxsee_en.ts \
     lang/gpxsee_es.ts \
     lang/gpxsee_pt_BR.ts \
     lang/gpxsee_uk.ts \
-    lang/gpxsee_hu.ts
+    lang/gpxsee_hu.ts \
+    lang/gpxsee_it.ts \
+    lang/gpxsee_eo.ts
 
 macx {
-    ICON = icons/gpxsee.icns
+    ICON = icons/app/gpxsee.icns
     QMAKE_INFO_PLIST = pkg/Info.plist
     locale.path = Contents/Resources/translations
     locale.files = lang/gpxsee_en.qm \
@@ -386,7 +406,8 @@ macx {
         lang/gpxsee_es.qm \
         lang/gpxsee_pt_BR.qm \
         lang/gpxsee_uk.qm \
-        lang/gpxsee_hu.qm
+        lang/gpxsee_hu.qm \
+        lang/gpxsee_it.qm
     csv.path = Contents/Resources
     csv.files = pkg/csv
     maps.path = Contents/Resources
@@ -406,12 +427,18 @@ macx {
         icons/formats/json.icns \
         icons/formats/cup.icns \
         icons/formats/gpi.icns \
-        icons/formats/sml.icns
+        icons/formats/sml.icns \
+        icons/formats/img.icns \
+        icons/formats/jnx.icns \
+        icons/formats/kap.icns \
+        icons/formats/mbts.icns \
+        icons/formats/rmap.icns \
+        icons/formats/tba.icns
     QMAKE_BUNDLE_DATA += locale maps icons csv
 }
 
 win32 {
-    RC_ICONS = icons/gpxsee.ico \
+    RC_ICONS = icons/app/gpxsee.ico \
         icons/formats/gpx.ico \
         icons/formats/tcx.ico \
         icons/formats/kml.ico \
@@ -426,7 +453,14 @@ win32 {
         icons/formats/json.ico \
         icons/formats/cup.ico \
         icons/formats/gpi.ico \
-        icons/formats/sml.ico
+        icons/formats/sml.ico \
+        icons/formats/img.ico \
+        icons/formats/jnx.ico \
+        icons/formats/kap.ico \
+        icons/formats/map.ico \
+        icons/formats/mbts.ico \
+        icons/formats/rmap.ico \
+        icons/formats/tba.ico
     DEFINES += _USE_MATH_DEFINES \
         NOGDI
 }
@@ -441,8 +475,8 @@ unix:!macx {
     csv.path = $$PREFIX/share/gpxsee/csv
     locale.files = lang/*.qm
     locale.path = $$PREFIX/share/gpxsee/translations
-    icon.files = icons/gpxsee.png
-    icon.path = $$PREFIX/share/pixmaps
+    icon.files = icons/app/hicolor/*
+    icon.path = $$PREFIX/share/icons/hicolor
     desktop.files = pkg/gpxsee.desktop
     desktop.path = $$PREFIX/share/applications
     mime.files = pkg/gpxsee.xml

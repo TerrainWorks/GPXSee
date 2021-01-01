@@ -5,6 +5,7 @@
 #include <QVector>
 #include <QHash>
 #include <QList>
+#include <QFlags>
 #include "common/rectc.h"
 #include "common/config.h"
 #include "data/waypoint.h"
@@ -28,24 +29,36 @@ class ScaleItem;
 class CoordinatesItem;
 class PathItem;
 class GraphItem;
-class AreaItem;
+class PlaneItem;
+class MapItem;
 class Area;
 class GraphicsScene;
+class QTimeZone;
+class MapAction;
 
 class MapView : public QGraphicsView
 {
 	Q_OBJECT
 
 public:
+	enum Flag {
+		NoFlags = 0,
+		HiRes = 1,
+		Expand = 2
+	};
+	Q_DECLARE_FLAGS(PlotFlags, Flag)
+
 	MapView(Map *map, POI *poi, QWidget *parent = 0);
 
 	QList<PathItem *> loadData(const Data &data);
+	void loadMaps(const QList<MapAction*> &maps);
 
 	void setPalette(const Palette &palette);
 	void setPOI(POI *poi);
 	void setMap(Map *map);
 
-	void plot(QPainter *painter, const QRectF &target, qreal scale, bool hires);
+	void plot(QPainter *painter, const QRectF &target, qreal scale,
+	  PlotFlags flags);
 
 	void clear();
 
@@ -83,8 +96,10 @@ public slots:
 	void showTicks(bool show);
 	void clearMapCache();
 	void setCoordinatesFormat(CoordinatesFormat format);
+	void setTimeZone(const QTimeZone &zone);
 	void setDevicePixelRatio(qreal deviceRatio, qreal mapRatio);
-	void setProjection(int id);
+	void setOutputProjection(int id);
+	void setInputProjection(int id);
 
 	void fitContentToSize();
 
@@ -97,6 +112,7 @@ private:
 
 	PathItem *addTrack(const Track &track);
 	PathItem *addRoute(const Route &route);
+	MapItem *addMap(MapAction *map);
 	void addArea(const Area &area);
 	void addWaypoints(const QVector<Waypoint> &waypoints);
 	void addPOI(const QList<Waypoint> &waypoints);
@@ -107,18 +123,20 @@ private:
 	QPointF contentCenter() const;
 	void rescale();
 	void centerOn(const QPointF &pos);
-	void zoom(int zoom, const QPoint &pos);
+	void zoom(int zoom, const QPoint &pos, bool shift);
 	void digitalZoom(int zoom);
 	void updatePOIVisibility();
 	void skipColor() {_palette.nextColor();}
 
+	void mouseMoveEvent(QMouseEvent *event);
+	void mousePressEvent(QMouseEvent *event);
 	void mouseDoubleClickEvent(QMouseEvent *event);
 	void wheelEvent(QWheelEvent *event);
 	void keyPressEvent(QKeyEvent *event);
+	void keyReleaseEvent(QKeyEvent *event);
 	void drawBackground(QPainter *painter, const QRectF &rect);
 	void paintEvent(QPaintEvent *event);
 	void scrollContentsBy(int dx, int dy);
-	void mouseMoveEvent(QMouseEvent *event);
 	void leaveEvent(QEvent *event);
 
 	GraphicsScene *_scene;
@@ -127,7 +145,7 @@ private:
 	QList<TrackItem*> _tracks;
 	QList<RouteItem*> _routes;
 	QList<WaypointItem*> _waypoints;
-	QList<AreaItem*> _areas;
+	QList<PlaneItem*> _areas;
 	POIHash _pois;
 
 	RectC _tr, _rr, _wr, _ar;
@@ -137,10 +155,8 @@ private:
 	POI *_poi;
 
 	Palette _palette;
-	Units _units;
-	CoordinatesFormat _coordinatesFormat;
 	qreal _mapOpacity;
-	Projection _projection;
+	Projection _outputProjection, _inputProjection;
 
 	bool _showMap, _showTracks, _showRoutes, _showAreas, _showWaypoints,
 	  _showWaypointLabels, _showPOI, _showPOILabels, _showRouteWaypoints,
@@ -154,11 +170,10 @@ private:
 
 	int _digitalZoom;
 	bool _plot;
+	QCursor _cursor;
 
-#ifdef ENABLE_HIDPI
 	qreal _deviceRatio;
 	qreal _mapRatio;
-#endif // ENABLE_HIDPI
 	bool _opengl;
 };
 

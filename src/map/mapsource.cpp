@@ -1,10 +1,10 @@
 #include <QFile>
 #include <QXmlStreamReader>
-#include "common/config.h"
 #include "onlinemap.h"
 #include "wmtsmap.h"
 #include "wmsmap.h"
 #include "osm.h"
+#include "invalidmap.h"
 #include "mapsource.h"
 
 
@@ -16,9 +16,9 @@ MapSource::Config::Config() : type(OSM), zooms(OSM::ZOOMS), bounds(OSM::BOUNDS),
 static CoordinateSystem coordinateSystem(QXmlStreamReader &reader)
 {
 	QXmlStreamAttributes attr = reader.attributes();
-	if (attr.value("axis") == "yx")
+	if (attr.value("axis") == QLatin1String("yx"))
 		return CoordinateSystem::YX;
-	else if (attr.value("axis") == "xy")
+	else if (attr.value("axis") == QLatin1String("xy"))
 		return CoordinateSystem::XY;
 	else
 		return CoordinateSystem::Unknown;
@@ -121,9 +121,9 @@ void MapSource::tile(QXmlStreamReader &reader, Config &config)
 			config.tileSize = size;
 	}
 	if (attr.hasAttribute("type")) {
-		if (attr.value("type") == "raster")
+		if (attr.value("type") == QLatin1String("raster"))
 			config.scalable = false;
-		else if (attr.value("type") == "vector")
+		else if (attr.value("type") == QLatin1String("vector"))
 			config.scalable = true;
 		else {
 			reader.raiseError("Invalid tile type");
@@ -131,33 +131,29 @@ void MapSource::tile(QXmlStreamReader &reader, Config &config)
 		}
 	}
 	if (attr.hasAttribute("pixelRatio")) {
-#ifdef ENABLE_HIDPI
 		qreal ratio = attr.value("pixelRatio").toString().toDouble(&ok);
 		if (!ok || ratio < 0) {
 			reader.raiseError("Invalid tile pixelRatio");
 			return;
 		} else
 			config.tileRatio = ratio;
-#else // ENABLE_HIDPI
-		reader.raiseError("HiDPI maps not supported");
-#endif // ENABLE_HIDPI
 	}
 }
 
 void MapSource::map(QXmlStreamReader &reader, Config &config)
 {
 	const QXmlStreamAttributes &attr = reader.attributes();
-	QStringRef type = attr.value("type");
+	QStringView type = attr.value("type");
 
-	if (type == "WMTS")
+	if (type == QLatin1String("WMTS"))
 		config.type = WMTS;
-	else if (type == "WMS")
+	else if (type == QLatin1String("WMS"))
 		config.type = WMS;
-	else if (type == "TMS")
+	else if (type == QLatin1String("TMS"))
 		config.type = TMS;
-	else if (type == "QuadTiles")
+	else if (type == QLatin1String("QuadTiles"))
 		config.type = QuadTiles;
-	else if (type == "OSM" || type.isEmpty())
+	else if (type == QLatin1String("OSM") || type.isEmpty())
 		config.type = OSM;
 	else {
 		reader.raiseError("Invalid map type");
@@ -165,56 +161,44 @@ void MapSource::map(QXmlStreamReader &reader, Config &config)
 	}
 
 	while (reader.readNextStartElement()) {
-		if (reader.name() == "name")
+		if (reader.name() == QLatin1String("name"))
 			config.name = reader.readElementText();
-		else if (reader.name() == "url") {
-			config.rest = (reader.attributes().value("type") == "REST")
-			  ? true : false;
+		else if (reader.name() == QLatin1String("url")) {
+			config.rest = (reader.attributes().value("type")
+			  == QLatin1String("REST")) ? true : false;
 			config.url = reader.readElementText();
-		} else if (reader.name() == "zoom") {
+		} else if (reader.name() == QLatin1String("zoom")) {
 			config.zooms = zooms(reader);
 			reader.skipCurrentElement();
-		} else if (reader.name() == "bounds") {
+		} else if (reader.name() == QLatin1String("bounds")) {
 			config.bounds = bounds(reader);
 			reader.skipCurrentElement();
-		} else if (reader.name() == "format")
+		} else if (reader.name() == QLatin1String("format"))
 			config.format = reader.readElementText();
-		else if (reader.name() == "layer")
+		else if (reader.name() == QLatin1String("layer"))
 			config.layer = reader.readElementText();
-		else if (reader.name() == "style")
+		else if (reader.name() == QLatin1String("style"))
 			config.style = reader.readElementText();
-		else if (reader.name() == "set") {
+		else if (reader.name() == QLatin1String("set")) {
 			config.coordinateSystem = coordinateSystem(reader);
 			config.set = reader.readElementText();
-		} else if (reader.name() == "dimension") {
+		} else if (reader.name() == QLatin1String("dimension")) {
 			QXmlStreamAttributes attr = reader.attributes();
 			if (!attr.hasAttribute("id"))
 				reader.raiseError("Missing dimension id");
 			else
 				config.dimensions.append(KV<QString, QString>
 				  (attr.value("id").toString(), reader.readElementText()));
-		} else if (reader.name() == "crs") {
+		} else if (reader.name() == QLatin1String("crs")) {
 			config.coordinateSystem = coordinateSystem(reader);
 			config.crs = reader.readElementText();
-		} else if (reader.name() == "authorization") {
+		} else if (reader.name() == QLatin1String("authorization")) {
 			QXmlStreamAttributes attr = reader.attributes();
 			config.authorization = Authorization(
 			  attr.value("username").toString(),
 			  attr.value("password").toString());
 			reader.skipCurrentElement();
-		} else if (reader.name() == "tilePixelRatio") {
-			// Legacy tilePixelRatio tag support
-#ifdef ENABLE_HIDPI
-			bool ok;
-			qreal ratio = reader.readElementText().toDouble(&ok);
-			if (!ok || ratio <= 0)
-				reader.raiseError("Invalid tilePixelRatio");
-			else
-				config.tileRatio = ratio;
-#else // ENABLE_HIDPI
-			reader.raiseError("HiDPI maps not supported");
-#endif // ENABLE_HIDPI
-		} else if (reader.name() == "tile") {
+		} else if (reader.name() == QLatin1String("tile")) {
 			tile(reader, config);
 			reader.skipCurrentElement();
 		} else
@@ -230,90 +214,75 @@ bool MapSource::isMap(const QString &path)
 		return false;
 
 	QXmlStreamReader reader(&file);
-	if (reader.readNextStartElement() && reader.name() == "map")
+	if (reader.readNextStartElement() && reader.name() == QLatin1String("map"))
 		return true;
 
 	return false;
 }
 
-Map *MapSource::loadMap(const QString &path, QString &errorString)
+Map *MapSource::loadMap(const QString &path)
 {
 	Config config;
 	QFile file(path);
 
 
-	if (!file.open(QFile::ReadOnly | QFile::Text)) {
-		errorString = file.errorString();
-		return 0;
-	}
+	if (!file.open(QFile::ReadOnly | QFile::Text))
+		return new InvalidMap(path, file.errorString());
 
 	QXmlStreamReader reader(&file);
 	if (reader.readNextStartElement()) {
-		if (reader.name() == "map")
+		if (reader.name() == QLatin1String("map"))
 			map(reader, config);
 		else
 			reader.raiseError("Not an online map source file");
 	}
-	if (reader.error()) {
-		errorString = QString("%1: %2").arg(reader.lineNumber())
-		  .arg(reader.errorString());
-		return 0;
-	}
+	if (reader.error())
+		return new InvalidMap(path, QString("%1: %2").arg(reader.lineNumber())
+		  .arg(reader.errorString()));
 
-	if (config.name.isEmpty()) {
-		errorString = "Missing name definition";
-		return 0;
-	}
-	if (config.url.isEmpty()) {
-		errorString = "Missing URL definition";
-		return 0;
-	}
+	if (config.name.isEmpty())
+		return new InvalidMap(path, "Missing name definition");
+	if (config.url.isEmpty())
+		return new InvalidMap(path, "Missing URL definition");
 	if (config.type == WMTS || config.type == WMS) {
-		if (config.layer.isEmpty()) {
-			errorString = "Missing layer definition";
-			return 0;
-		}
-		if (config.format.isEmpty()) {
-			errorString = "Missing format definition";
-			return 0;
-		}
+		if (config.layer.isEmpty())
+			return new InvalidMap(path, "Missing layer definition");
+		if (config.format.isEmpty())
+			return new InvalidMap(path, "Missing format definition");
 	}
 	if (config.type == WMTS) {
-		if (config.set.isEmpty()) {
-			errorString = "Missing set definiton";
-			return 0;
-		}
+		if (config.set.isEmpty())
+			return new InvalidMap(path, "Missing set definiton");
 	}
 	if (config.type == WMS) {
-		if (config.crs.isEmpty()) {
-			errorString = "Missing CRS definiton";
-			return 0;
-		}
+		if (config.crs.isEmpty())
+			return new InvalidMap(path, "Missing CRS definiton");
 	}
 
 	switch (config.type) {
 		case WMTS:
-			return new WMTSMap(config.name, WMTS::Setup(config.url, config.layer,
-			  config.set, config.style, config.format, config.rest,
+			return new WMTSMap(path, config.name, WMTS::Setup(config.url,
+			  config.layer, config.set, config.style, config.format, config.rest,
 			  config.coordinateSystem, config.dimensions, config.authorization),
 			  config.tileRatio);
 		case WMS:
-			return new WMSMap(config.name, WMS::Setup(config.url, config.layer,
-			  config.style, config.format, config.crs, config.coordinateSystem,
-			  config.dimensions, config.authorization), config.tileSize);
+			return new WMSMap(path, config.name, WMS::Setup(config.url,
+			  config.layer, config.style, config.format, config.crs,
+			  config.coordinateSystem, config.dimensions, config.authorization),
+			  config.tileSize);
 		case TMS:
-			return new OnlineMap(config.name, config.url, config.zooms,
+			return new OnlineMap(path, config.name, config.url, config.zooms,
 			  config.bounds, config.tileRatio, config.authorization,
 			  config.tileSize, config.scalable, true, false);
 		case OSM:
-			return new OnlineMap(config.name, config.url, config.zooms,
+			return new OnlineMap(path, config.name, config.url, config.zooms,
 			 config.bounds, config.tileRatio, config.authorization,
 			 config.tileSize, config.scalable, false, false);
 		case QuadTiles:
-			return new OnlineMap(config.name, config.url, config.zooms,
+			return new OnlineMap(path, config.name, config.url, config.zooms,
 			 config.bounds, config.tileRatio, config.authorization,
 			 config.tileSize, config.scalable, false, true);
 		default:
-			return 0;
+			return new InvalidMap(path, "Invalid map type");
 	}
 }

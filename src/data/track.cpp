@@ -17,7 +17,7 @@ bool Track::_useReportedSpeed = false;
 bool Track::_useDEM = false;
 bool Track::_show2ndElevation = false;
 bool Track::_show2ndSpeed = false;
-
+bool Track::_useSegments = true;
 
 static qreal avg(const QVector<qreal> &v)
 {
@@ -31,7 +31,7 @@ static qreal avg(const QVector<qreal> &v)
 
 static qreal median(QVector<qreal> &v)
 {
-	qSort(v.begin(), v.end());
+	std::sort(v.begin(), v.end());
 	return v.at(v.size() / 2);
 }
 
@@ -42,6 +42,12 @@ static qreal MAD(QVector<qreal> &v, qreal m)
 	return median(v);
 }
 
+/*
+   Modified Z-score (Iglewicz and Hoaglin)
+   The acceleration data distribution has usualy a (much) higher kurtosis than
+   the normal distribution thus a higher comparsion value than the usual 3.5 is
+   required.
+*/
 static QSet<int> eliminate(const QVector<qreal> &v)
 {
 	QSet<int> rm;
@@ -51,7 +57,7 @@ static QSet<int> eliminate(const QVector<qreal> &v)
 	qreal M = MAD(w, m);
 
 	for (int i = 0; i < v.size(); i++)
-		if (qAbs((0.6745 * (v.at(i) - m)) / M) > 3.5)
+		if (qAbs((0.6745 * (v.at(i) - m)) / M) > 5.0)
 			rm.insert(i);
 
 	return rm;
@@ -82,9 +88,19 @@ static GraphSegment filter(const GraphSegment &g, int window)
 }
 
 
-Track::Track(const TrackData &data) : _data(data), _pause(0)
+Track::Track(const TrackData &data) : _pause(0)
 {
 	qreal ds, dt;
+
+	if (_useSegments)
+		_data = data;
+	else {
+		if (!data.isEmpty()) {
+			_data.append(data.first());
+			for (int i = 1; i < data.size(); i++)
+				_data.first() << data.at(i);
+		}
+	}
 
 	for (int i = 0; i < _data.size(); i++) {
 		const SegmentData &sd = _data.at(i);

@@ -20,6 +20,7 @@ public:
 	QString name() const {return _name;}
 
 	QRectF bounds();
+	RectC llBounds() {return _bounds;}
 
 	int zoom() const {return _zoom;}
 	void setZoom(int zoom) {_zoom = zoom;}
@@ -30,8 +31,12 @@ public:
 	QPointF ll2xy(const Coordinates &c);
 	Coordinates xy2ll(const QPointF &p);
 
+	void load();
+	void unload();
+
 	void draw(QPainter *painter, const QRectF &rect, Flags flags);
 
+	void setInputProjection(const Projection &projection);
 	void setDevicePixelRatio(qreal /*deviceRatio*/, qreal mapRatio)
 	  {_mapRatio = mapRatio;}
 
@@ -40,9 +45,12 @@ public:
 
 private:
 	struct Tile {
-		QPointF pos;
+		qint32 top, right, bottom, left;
+		quint16 width, height;
 		quint32 size;
 		quint32 offset;
+
+		QPointF pos;
 	};
 
 	struct Zoom {

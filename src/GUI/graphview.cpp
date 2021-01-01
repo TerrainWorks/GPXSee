@@ -6,9 +6,10 @@
 #include <QGraphicsSimpleTextItem>
 #include <QPalette>
 #include <QLocale>
+#include <QOpenGLWidget>
 #include "data/graph.h"
-#include "opengl.h"
 #include "axisitem.h"
+#include "axislabelitem.h"
 #include "slideritem.h"
 #include "sliderinfoitem.h"
 #include "infoitem.h"
@@ -21,6 +22,9 @@
 
 
 #define MARGIN 10.0
+
+#define IW(item) ((item)->boundingRect().width())
+#define IH(item) ((item)->boundingRect().height())
 
 GraphView::GraphView(QWidget *parent)
 	: QGraphicsView(parent)
@@ -38,6 +42,10 @@ GraphView::GraphView(QWidget *parent)
 	_xAxis->setZValue(1.0);
 	_yAxis = new AxisItem(AxisItem::Y);
 	_yAxis->setZValue(1.0);
+	_xAxisLabel = new AxisLabelItem(AxisLabelItem::X);
+	_xAxisLabel->setZValue(1.0);
+	_yAxisLabel = new AxisLabelItem(AxisLabelItem::Y);
+	_yAxisLabel->setZValue(1.0);
 	_slider = new SliderItem();
 	_slider->setZValue(4.0);
 	_sliderInfo = new SliderInfoItem(_slider);
@@ -73,34 +81,24 @@ GraphView::~GraphView()
 {
 	delete _xAxis;
 	delete _yAxis;
+	delete _xAxisLabel;
+	delete _yAxisLabel;
 	delete _slider;
 	delete _info;
 	delete _grid;
 	delete _message;
 }
 
-void GraphView::createXLabel()
-{
-	_xAxis->setLabel(QString("%1 [%2]").arg(_xLabel,
-	  _xUnits.isEmpty() ? "-" : _xUnits));
-}
-
-void GraphView::createYLabel()
-{
-	_yAxis->setLabel(QString("%1 [%2]").arg(_yLabel,
-	  _yUnits.isEmpty() ? "-" : _yUnits));
-}
-
 void GraphView::setYLabel(const QString &label)
 {
 	_yLabel = label;
-	createYLabel();
+	_yAxisLabel->setLabel(_yLabel, _yUnits);
 }
 
 void GraphView::setYUnits(const QString &units)
 {
 	_yUnits = units;
-	createYLabel();
+	_yAxisLabel->setLabel(_yLabel, _yUnits);
 }
 
 void GraphView::setXUnits()
@@ -144,7 +142,7 @@ void GraphView::setXUnits()
 			}
 	}
 
-	createXLabel();
+	_xAxisLabel->setLabel(_xLabel, _xUnits);
 }
 
 void GraphView::setUnits(Units units)
@@ -163,6 +161,7 @@ void GraphView::setGraphType(GraphType type)
 {
 	_graphType = type;
 	_bounds = QRectF();
+	_zoom = 1.0;
 
 	for (int i = 0; i < _graphs.count(); i++) {
 		GraphItem *gi = _graphs.at(i);
@@ -257,6 +256,8 @@ void GraphView::redraw(const QSizeF &size)
 	if (_bounds.isNull()) {
 		removeItem(_xAxis);
 		removeItem(_yAxis);
+		removeItem(_xAxisLabel);
+		removeItem(_yAxisLabel);
 		removeItem(_slider);
 		removeItem(_info);
 		removeItem(_grid);
@@ -268,6 +269,8 @@ void GraphView::redraw(const QSizeF &size)
 	removeItem(_message);
 	addItem(_xAxis);
 	addItem(_yAxis);
+	addItem(_xAxisLabel);
+	addItem(_yAxisLabel);
 	addItem(_slider);
 	addItem(_info);
 	addItem(_grid);
@@ -278,7 +281,9 @@ void GraphView::redraw(const QSizeF &size)
 	if (ry.size() < _minYRange * _yScale)
 		ry.resize(_minYRange * _yScale);
 
+	_xAxis->setZoom(_zoom);
 	_xAxis->setRange(rx);
+	_xAxis->setZoom(_zoom);
 	_yAxis->setRange(ry);
 	mx = _xAxis->margin();
 	my = _yAxis->margin();
@@ -288,9 +293,10 @@ void GraphView::redraw(const QSizeF &size)
 		r.adjust(0, -(_minYRange/2 - r.height()/2), 0,
 		  _minYRange/2 - r.height()/2);
 
-	sx = (size.width() - (my.width() + mx.width())) / r.width();
+	sx = (size.width() - (my.width() + mx.width()) - IW(_yAxisLabel))
+	  / r.width();
 	sy = (size.height() - (mx.height() + my.height())
-	  - _info->boundingRect().height()) / r.height();
+	  - IH(_info) - IH(_xAxisLabel)) / r.height();
 	sx *= _zoom;
 
 	for (int i = 0; i < _graphs.size(); i++)
@@ -316,10 +322,12 @@ void GraphView::redraw(const QSizeF &size)
 	_slider->setArea(r);
 	updateSliderPosition();
 
-	r |= _xAxis->sceneBoundingRect();
-	r |= _yAxis->sceneBoundingRect();
-	_info->setPos(r.topLeft() + QPointF(r.width()/2
-	  - _info->boundingRect().width()/2, -_info->boundingRect().height()));
+	_info->setPos(QPointF(r.width()/2 - IW(_info)/2 - (IW(_yAxisLabel)
+	  + IW(_yAxis))/2, r.top() - IH(_info) - my.height()));
+	_xAxisLabel->setPos(QPointF(r.width()/2 - IW(_xAxisLabel)/2,
+	  r.bottom() + mx.height()));
+	_yAxisLabel->setPos(QPointF(r.left() - my.width() - IW(_yAxisLabel),
+	  r.bottom() - (r.height()/2 + IH(_yAxisLabel)/2)));
 
 	_scene->setSceneRect(_scene->itemsBoundingRect());
 }
@@ -343,23 +351,31 @@ void GraphView::wheelEvent(QWheelEvent *e)
 {
 	static int deg = 0;
 
-	deg += e->delta() / 8;
+	deg += e->angleDelta().y() / 8;
 	if (qAbs(deg) < 15)
 		return;
 	deg = 0;
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
 	QPointF pos = mapToScene(e->pos());
+#else // QT 5.15
+	QPointF pos = mapToScene(e->position().toPoint());
+#endif // QT 5.15
 	QRectF gr(_grid->boundingRect());
 	QPointF r(pos.x() / gr.width(), pos.y() / gr.height());
 
-	_zoom = (e->delta() > 0) ? _zoom * 1.25 : qMax(_zoom / 1.25, 1.0);
+	_zoom = (e->angleDelta().y() > 0) ? _zoom * 1.25 : qMax(_zoom / 1.25, 1.0);
 	redraw();
 
 	QRectF ngr(_grid->boundingRect());
 	QPointF npos(mapFromScene(QPointF(r.x() * ngr.width(),
 	  r.y() * ngr.height())));
 	QScrollBar *sb = horizontalScrollBar();
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
 	sb->setSliderPosition(sb->sliderPosition() + npos.x() - e->pos().x());
+#else // QT 5.15
+	sb->setSliderPosition(sb->sliderPosition() + npos.x() - e->position().x());
+#endif // QT 5.15
 
 	QGraphicsView::wheelEvent(e);
 }
@@ -367,8 +383,10 @@ void GraphView::wheelEvent(QWheelEvent *e)
 void GraphView::paintEvent(QPaintEvent *e)
 {
 	QRectF viewRect(mapToScene(rect()).boundingRect());
-	_info->setPos(QPointF(viewRect.left() + (viewRect.width()
-	  - _info->boundingRect().width())/2.0, _info->pos().y()));
+	_info->setPos(QPointF(viewRect.left() + (viewRect.width() - IW(_info))/2.0,
+	  _info->pos().y()));
+	_xAxisLabel->setPos(QPointF(viewRect.left() + (viewRect.width()
+	  - IW(_xAxisLabel))/2.0, _xAxisLabel->pos().y()));
 
 	QGraphicsView::paintEvent(e);
 }
@@ -446,8 +464,8 @@ void GraphView::updateSliderInfo()
 	  'f', _precision) + UNIT_SPACE + _yUnits);
 	if (cardinal && cardinal->secondaryGraph()) {
 		qreal delta = y - cardinal->secondaryGraph()->yAtX(_sliderPos);
-		yText += " " + QChar(0x0394) + l.toString(-delta * _yScale + _yOffset,
-		  'f', _precision) + UNIT_SPACE + _yUnits;
+		yText += QString(" ") + QChar(0x0394) + l.toString(-delta * _yScale
+		  + _yOffset, 'f', _precision) + UNIT_SPACE + _yUnits;
 	}
 	_sliderInfo->setText(xText, yText);
 }
@@ -527,7 +545,7 @@ void GraphView::setGraphWidth(int width)
 void GraphView::useOpenGL(bool use)
 {
 	if (use)
-		setViewport(new OPENGL_WIDGET);
+		setViewport(new QOpenGLWidget);
 	else
 		setViewport(new QWidget);
 }

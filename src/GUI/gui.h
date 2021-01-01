@@ -10,7 +10,8 @@
 #include "units.h"
 #include "timetype.h"
 #include "format.h"
-#include "exportdialog.h"
+#include "pdfexportdialog.h"
+#include "pngexportdialog.h"
 #include "optionsdialog.h"
 
 class QMenu;
@@ -29,6 +30,7 @@ class Map;
 class POI;
 class QScreen;
 class MapAction;
+class Data;
 
 class GUI : public QMainWindow
 {
@@ -37,7 +39,9 @@ class GUI : public QMainWindow
 public:
 	GUI();
 
-	bool openFile(const QString &fileName);
+	bool openFile(const QString &fileName, bool silent = false);
+	bool loadMap(const QString &fileName, MapAction *&action,
+	  bool silent = false);
 	void show();
 
 private slots:
@@ -45,10 +49,11 @@ private slots:
 	void keys();
 	void paths();
 	void printFile();
-	void exportFile();
+	void exportPDFFile();
+	void exportPNGFile();
 	void openFile();
 	void closeAll();
-	void reloadFile();
+	void reloadFiles();
 	void statistics();
 	void openPOIFile();
 	void closePOIFiles();
@@ -60,9 +65,11 @@ private slots:
 	void showTracks(bool show);
 	void showRoutes(bool show);
 	void loadMap();
+	void loadMapDir();
 	void nextMap();
 	void prevMap();
 	void openOptions();
+	void clearMapCache();
 
 	void mapChanged();
 	void graphChanged(int);
@@ -89,14 +96,19 @@ private slots:
 	void logicalDotsPerInchChanged(qreal dpi);
 
 	void mapLoaded();
+	void mapLoadedDir();
 	void mapInitialized();
 
 private:
-	typedef QPair<QDate, QDate> DateRange;
+	typedef QPair<QDateTime, QDateTime> DateTimeRange;
 
 	void loadPOIs();
 	void closeFiles();
 	void plot(QPrinter *printer);
+	void plotMainPage(QPainter *painter, const QRectF &rect, qreal ratio,
+	  bool expand = false);
+	void plotGraphsPage(QPainter *painter, const QRectF &rect, qreal ratio);
+	qreal graphPlotHeight(const QRectF &rect, qreal ratio);
 
 	QAction *createPOIFileAction(const QString &fileName);
 	MapAction *createMapAction(Map *map);
@@ -111,9 +123,8 @@ private:
 	void createBrowser();
 
 	bool openPOIFile(const QString &fileName);
-	bool loadFile(const QString &fileName);
-	bool loadMap(const QString &fileName);
-	void exportFile(const QString &fileName);
+	bool loadFile(const QString &fileName, bool silent = false);
+	void loadData(const Data &data);
 	void updateStatusBarInfo();
 	void updateWindowTitle();
 	void updateNavigationActions();
@@ -153,7 +164,8 @@ private:
 	QAction *_aboutAction;
 	QAction *_aboutQtAction;
 	QAction *_printFileAction;
-	QAction *_exportFileAction;
+	QAction *_exportPDFFileAction;
+	QAction *_exportPNGFileAction;
 	QAction *_openFileAction;
 	QAction *_closeFileAction;
 	QAction *_reloadFileAction;
@@ -166,6 +178,7 @@ private:
 	QAction *_showMapAction;
 	QAction *_fullscreenAction;
 	QAction *_loadMapAction;
+	QAction *_loadMapDirAction;
 	QAction *_clearMapCacheAction;
 	QAction *_showGraphsAction;
 	QAction *_showGraphGridAction;
@@ -220,7 +233,7 @@ private:
 	int _trackCount, _routeCount, _areaCount, _waypointCount;
 	qreal _trackDistance, _routeDistance;
 	qreal _time, _movingTime;
-	DateRange _dateRange;
+	DateTimeRange _dateRange;
 	QString _pathName;
 
 	qreal _sliderPos;
@@ -228,10 +241,13 @@ private:
 	QList<QByteArray> _windowStates;
 	int _frameStyle;
 
-	Export _export;
+	PDFExport _pdfExport;
+	PNGExport _pngExport;
 	Options _options;
 
 	QString _dataDir, _mapDir, _poiDir;
+
+	Units _units;
 };
 
 #endif // GUI_H

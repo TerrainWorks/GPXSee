@@ -2,9 +2,9 @@
 #define OPTIONSDIALOG_H
 
 #include <QDialog>
-#include "common/config.h"
 #include "palette.h"
 #include "units.h"
+#include "timezoneinfo.h"
 
 class ColorBox;
 class StyleComboBox;
@@ -16,6 +16,7 @@ class QCheckBox;
 class QRadioButton;
 class PercentSlider;
 class LimitedComboBox;
+
 
 struct Options {
 	// Appearance
@@ -38,10 +39,9 @@ struct Options {
 	int mapOpacity;
 	QColor backgroundColor;
 	// Map
-	int projection;
-#ifdef ENABLE_HIDPI
+	int outputProjection;
+	int inputProjection;
 	bool hidpiMap;
-#endif // ENABLE_HIDPI
 	// Data
 	int elevationFilter;
 	int speedFilter;
@@ -56,13 +56,13 @@ struct Options {
 	bool dataUseDEM;
 	bool showSecondaryElevation;
 	bool showSecondarySpeed;
+	TimeZoneInfo timeZone;
+	bool useSegments;
 	// POI
 	int poiRadius;
 	// System
 	bool useOpenGL;
-#ifdef ENABLE_HTTP2
 	bool enableHTTP2;
-#endif // ENABLE_HTTP2
 	int pixmapCache;
 	int connectionTimeout;
 	// Print/Export
@@ -74,8 +74,6 @@ struct Options {
 	bool printMovingTime;
 	bool printItemCount;
 	bool separateGraphPage;
-
-	Units units;
 };
 
 class OptionsDialog : public QDialog
@@ -86,7 +84,7 @@ public slots:
 	void accept();
 
 public:
-	OptionsDialog(Options *options, QWidget *parent = 0);
+	OptionsDialog(Options &options, Units units, QWidget *parent = 0);
 
 private slots:
 	void automaticPauseDetectionSet(bool set);
@@ -99,11 +97,12 @@ private:
 	QWidget *createSystemPage();
 	QWidget *createExportPage();
 
-	Options *_options;
+	Options &_options;
 
+	Units _units;
 	// Appearance
 	ColorBox *_baseColor;
-	QDoubleSpinBox *_colorOffset;
+	PercentSlider *_colorOffset;
 	PercentSlider *_mapOpacity;
 	ColorBox *_backgroundColor;
 	QSpinBox *_trackWidth;
@@ -122,11 +121,10 @@ private:
 	ColorBox *_sliderColor;
 	QCheckBox *_graphAA;
 	// Map
-	LimitedComboBox *_projection;
-#ifdef ENABLE_HIDPI
+	LimitedComboBox *_outputProjection;
+	LimitedComboBox *_inputProjection;
 	QRadioButton *_hidpi;
 	QRadioButton *_lodpi;
-#endif // ENABLE_HIDPI
 	// Data
 	OddSpinBox *_elevationFilter;
 	OddSpinBox *_speedFilter;
@@ -134,7 +132,6 @@ private:
 	OddSpinBox *_cadenceFilter;
 	OddSpinBox *_powerFilter;
 	QCheckBox *_outlierEliminate;
-
 	QRadioButton *_automaticPause;
 	QRadioButton *_manualPause;
 	QDoubleSpinBox *_pauseSpeed;
@@ -145,15 +142,18 @@ private:
 	QRadioButton *_dataDEMElevation;
 	QCheckBox *_showSecondaryElevation;
 	QCheckBox *_showSecondarySpeed;
+	QRadioButton *_utcZone;
+	QRadioButton *_systemZone;
+	QRadioButton *_customZone;
+	QComboBox *_timeZone;
+	QCheckBox *_useSegments;
 	// POI
 	QDoubleSpinBox *_poiRadius;
 	// System
 	QSpinBox *_pixmapCache;
 	QSpinBox *_connectionTimeout;
 	QCheckBox *_useOpenGL;
-#ifdef ENABLE_HTTP2
 	QCheckBox *_enableHTTP2;
-#endif // ENABLE_HTTP2
 	// Print/Export
 	QRadioButton *_wysiwyg;
 	QRadioButton *_hires;

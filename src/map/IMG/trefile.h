@@ -14,7 +14,7 @@ class TREFile : public SubFile
 {
 public:
 	TREFile(IMG *img) : SubFile(img) {}
-	TREFile(const QString &path) : SubFile(path) {}
+	TREFile(const QString *path) : SubFile(path) {}
 	TREFile(SubFile *gmp, quint32 offset) : SubFile(gmp, offset) {}
 	~TREFile();
 
@@ -46,9 +46,8 @@ private:
 
 	bool load(int idx);
 	int level(int bits, bool baseMap);
-	bool parsePoly(Handle hdl, quint32 pos, const QMap<int, int> &level2bits,
-	  QMap<quint32, int> &map);
-	bool parsePoints(Handle hdl, quint32 pos, const QMap<int, int> &level2bits);
+	int readExtEntry(Handle &hdl, quint32 &polygons, quint32 &lines,
+	  quint32 &points);
 
 	friend QDebug operator<<(QDebug dbg, const MapLevel &level);
 

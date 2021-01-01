@@ -10,6 +10,7 @@
 
 
 class AxisItem;
+class AxisLabelItem;
 class SliderItem;
 class SliderInfoItem;
 class GraphItem;
@@ -86,8 +87,6 @@ private slots:
 private:
 	void redraw(const QSizeF &size);
 	void setXUnits();
-	void createXLabel();
-	void createYLabel();
 	void updateSliderPosition();
 	void updateSliderInfo();
 	void removeItem(QGraphicsItem *item);
@@ -96,6 +95,7 @@ private:
 	GraphicsScene *_scene;
 
 	AxisItem *_xAxis, *_yAxis;
+	AxisLabelItem *_xAxisLabel, *_yAxisLabel;
 	SliderItem *_slider;
 	SliderInfoItem *_sliderInfo;
 	InfoItem *_info;

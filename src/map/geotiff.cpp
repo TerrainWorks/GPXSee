@@ -55,25 +55,26 @@
 #define CT_AlbersEqualArea             11
 #define CT_PolarStereographic          15
 #define CT_ObliqueStereographic        16
+#define CT_Polyconic                   22
 
 
 #define IS_SET(map, key) \
 	((map).contains(key) && (map).value(key).SHORT != 32767)
 
 
-typedef struct {
+struct GeoKeyHeader {
 	quint16 KeyDirectoryVersion;
 	quint16 KeyRevision;
 	quint16 MinorRevision;
 	quint16 NumberOfKeys;
-} Header;
+};
 
-typedef struct {
+struct GeoKeyEntry {
 	quint16 KeyID;
 	quint16 TIFFTagLocation;
 	quint16 Count;
 	quint16 ValueOffset;
-} KeyEntry;
+};
 
 
 bool GeoTIFF::readEntry(TIFFFile &file, Ctx &ctx) const
@@ -196,8 +197,8 @@ bool GeoTIFF::readMatrix(TIFFFile &file, quint32 offset, double matrix[16]) cons
 
 bool GeoTIFF::readKeys(TIFFFile &file, Ctx &ctx, QMap<quint16, Value> &kv) const
 {
-	Header header;
-	KeyEntry entry;
+	GeoKeyHeader header;
+	GeoKeyEntry entry;
 	Value value;
 
 	if (!file.seek(ctx.keys))
@@ -310,8 +311,8 @@ const GCS *GeoTIFF::gcs(QMap<quint16, Value> &kv)
 		  ? kv.value(GeogGeodeticDatumGeoKey).SHORT : 6326;
 
 		if (!(gcs = GCS::gcs(gd, pm, au)))
-			_errorString = QString("%1+%2: unknown geodetic datum + prime"
-			  " meridian combination").arg(gd).arg(pm);
+			_errorString = QString("%1+%2+%3: unknown geodetic datum + prime"
+			  " meridian + units combination").arg(gd).arg(pm).arg(au);
 	} else
 		_errorString = "Can not determine GCS";
 
@@ -344,6 +345,8 @@ Projection::Method GeoTIFF::method(QMap<quint16, Value> &kv)
 			return Projection::Method(9829);
 		case CT_ObliqueStereographic:
 			return Projection::Method(9809);
+		case CT_Polyconic:
+			return Projection::Method(9818);
 		default:
 			_errorString = QString("%1: unknown coordinate transformation method")
 			  .arg(kv.value(ProjCoordTransGeoKey).SHORT);

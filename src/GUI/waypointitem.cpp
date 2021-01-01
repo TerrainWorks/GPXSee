@@ -13,9 +13,15 @@
 #define FS(size) \
 	((int)((qreal)size * 1.41))
 
+
+Units WaypointItem::_units = Metric;
+CoordinatesFormat WaypointItem::_format = DecimalDegrees;
+QTimeZone WaypointItem::_timeZone = QTimeZone::utc();
+
 QString WaypointItem::info() const
 {
 	ToolTip tt;
+	QLocale l;
 
 	if (!_waypoint.name().isEmpty())
 		tt.insert(qApp->translate("WaypointItem", "Name"), _waypoint.name());
@@ -30,7 +36,8 @@ QString WaypointItem::info() const
 	}
 	if (_waypoint.timestamp().isValid())
 		tt.insert(qApp->translate("WaypointItem", "Date"),
-		  _waypoint.timestamp().toString(Qt::SystemLocaleShortDate));
+		  l.toString(_waypoint.timestamp().toTimeZone(_timeZone),
+		  QLocale::ShortFormat));
 	if (!_waypoint.description().isEmpty())
 		tt.insert(qApp->translate("WaypointItem", "Description"),
 		  _waypoint.description());
@@ -77,9 +84,6 @@ WaypointItem::WaypointItem(const Waypoint &waypoint, Map *map,
 
 	_font.setPixelSize(FS(_size));
 	_font.setFamily(FONT_FAMILY);
-
-	_units = Metric;
-	_format = DecimalDegrees;
 
 	updateCache();
 
@@ -149,12 +153,6 @@ void WaypointItem::setColor(const QColor &color)
 
 	_color = color;
 	update();
-}
-
-void WaypointItem::setToolTipFormat(Units units, CoordinatesFormat format)
-{
-	_units = units;
-	_format = format;
 }
 
 void WaypointItem::showLabel(bool show)

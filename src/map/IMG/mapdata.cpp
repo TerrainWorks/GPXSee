@@ -54,7 +54,7 @@ inline bool pointCb(VectorTile *tile, void *context)
 }
 
 
-MapData::MapData() : _typ(0), _style(0), _zooms(15, 28), _baseMap(false),
+MapData::MapData() : _typ(0), _style(0), _zooms(24, 28), _baseMap(false),
   _valid(false)
 {
 	_polyCache.setMaxCost(CACHED_SUBDIVS_COUNT);
@@ -107,7 +107,7 @@ void MapData::load()
 	else {
 		QString typFile(ProgramPaths::typFile());
 		if (!typFile.isEmpty()) {
-			SubFile typ(typFile);
+			SubFile typ(&typFile);
 			_style = new Style(&typ);
 		} else
 			_style = new Style();

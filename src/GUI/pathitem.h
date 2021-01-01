@@ -3,6 +3,7 @@
 
 #include <QGraphicsObject>
 #include <QPen>
+#include <QTimeZone>
 #include "data/path.h"
 #include "markeritem.h"
 #include "units.h"
@@ -28,7 +29,6 @@ public:
 
 	void setMap(Map *map);
 
-	void setUnits(Units units);
 	void setColor(const QColor &color);
 	void setWidth(qreal width);
 	void setStyle(Qt::PenStyle style);
@@ -36,6 +36,11 @@ public:
 	void setMarkerColor(const QColor &color);
 	void showMarker(bool show);
 	void showTicks(bool show);
+
+	void updateTicks();
+
+	static void setUnits(Units units) {_units = units;}
+	static void setTimeZone(const QTimeZone &zone) {_timeZone = zone;}
 
 public slots:
 	void moveMarker(qreal distance);
@@ -49,7 +54,8 @@ protected:
 	void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
 	void mousePressEvent(QGraphicsSceneMouseEvent *event);
 
-	Units _units;
+	static Units _units;
+	static QTimeZone _timeZone;
 
 private:
 	const PathSegment *segment(qreal x) const;
@@ -60,7 +66,6 @@ private:
 
 	qreal xInM() const;
 	unsigned tickSize() const;
-	void updateTicks();
 
 	Path _path;
 	Map *_map;

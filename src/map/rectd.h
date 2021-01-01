@@ -16,6 +16,9 @@ public:
 
 	PointD topLeft() const {return _tl;}
 	PointD bottomRight() const {return _br;}
+	PointD center() const
+	  {return PointD((_tl.x() + _br.x()) / 2.0,
+		(_tl.y() + _br.y()) / 2.0);}
 
 	double left() const {return _tl.x();}
 	double right() const {return _br.x();}
@@ -35,7 +38,9 @@ public:
 	  && p.y() >= bottom());}
 
 	bool isNull() const {return _tl.isNull() && _br.isNull();}
-	bool isValid() const {return !(_tl.isNull() || _br.isNull());}
+	bool isValid() const
+	  {return (_tl.isValid() && _br.isValid()
+	  && _tl.x() != _br.x() && _tl.y() != _br.y());}
 
 	RectC toRectC(const Projection &proj, int samples = 100) const;
 

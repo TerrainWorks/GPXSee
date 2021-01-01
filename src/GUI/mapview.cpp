@@ -3,19 +3,22 @@
 #include <QWheelEvent>
 #include <QApplication>
 #include <QScrollBar>
+#include <QClipboard>
+#include <QOpenGLWidget>
 #include "data/poi.h"
 #include "data/data.h"
 #include "map/map.h"
 #include "map/pcs.h"
-#include "opengl.h"
 #include "trackitem.h"
 #include "routeitem.h"
 #include "waypointitem.h"
 #include "areaitem.h"
 #include "scaleitem.h"
 #include "coordinatesitem.h"
+#include "mapitem.h"
 #include "keys.h"
 #include "graphicsscene.h"
+#include "mapaction.h"
 #include "mapview.h"
 
 
@@ -24,6 +27,20 @@
 #define MARGIN           10
 #define SCALE_OFFSET     7
 #define COORDINATES_OFFSET SCALE_OFFSET
+
+
+template<typename T>
+static void updateZValues(T &items)
+{
+	for (int i = 0; i < items.size(); i++) {
+		const QGraphicsItem *ai = items.at(i);
+		for (int j = 0; j < items.size(); j++) {
+			QGraphicsItem *aj = items[j];
+			if (aj->boundingRect().contains(ai->boundingRect()))
+				aj->setZValue(qMin(ai->zValue() - 1, aj->zValue()));
+		}
+	}
+}
 
 
 MapView::MapView(Map *map, POI *poi, QWidget *parent)
@@ -38,7 +55,7 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
 	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	setRenderHint(QPainter::Antialiasing, true);
+	setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 	setResizeAnchor(QGraphicsView::AnchorViewCenter);
 	setAcceptDrops(false);
 
@@ -50,17 +67,17 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	_coordinates->setVisible(false);
 	_scene->addItem(_coordinates);
 
-	_projection = PCS::pcs(3857);
+	_outputProjection = PCS::pcs(3857);
+	_inputProjection = GCS::gcs(4326);
 	_map = map;
 	_map->load();
-	_map->setProjection(_projection);
+	_map->setOutputProjection(_outputProjection);
+	_map->setInputProjection(_inputProjection);
 	connect(_map, SIGNAL(tilesLoaded()), this, SLOT(reloadMap()));
 
 	_poi = poi;
 	connect(_poi, SIGNAL(pointsChanged()), this, SLOT(updatePOI()));
 
-	_units = Metric;
-	_coordinatesFormat = DecimalDegrees;
 	_mapOpacity = 1.0;
 	_backgroundColor = Qt::white;
 	_markerColor = Qt::red;
@@ -86,10 +103,8 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	_poiSize = 8;
 	_poiColor = Qt::black;
 
-#ifdef ENABLE_HIDPI
 	_deviceRatio = 1.0;
 	_mapRatio = 1.0;
-#endif // ENABLE_HIDPI
 	_opengl = false;
 	_plot = false;
 	_digitalZoom = 0;
@@ -122,7 +137,6 @@ PathItem *MapView::addTrack(const Track &track)
 	ti->setColor(_palette.nextColor());
 	ti->setWidth(_trackWidth);
 	ti->setStyle(_trackStyle);
-	ti->setUnits(_units);
 	ti->setVisible(_showTracks);
 	ti->setDigitalZoom(_digitalZoom);
 	ti->setMarkerColor(_markerColor);
@@ -149,8 +163,6 @@ PathItem *MapView::addRoute(const Route &route)
 	ri->setColor(_palette.nextColor());
 	ri->setWidth(_routeWidth);
 	ri->setStyle(_routeStyle);
-	ri->setUnits(_units);
-	ri->setCoordinatesFormat(_coordinatesFormat);
 	ri->setVisible(_showRoutes);
 	ri->showWaypoints(_showRouteWaypoints);
 	ri->showWaypointLabels(_showWaypointLabels);
@@ -174,18 +186,19 @@ void MapView::addArea(const Area &area)
 	}
 
 	AreaItem *ai = new AreaItem(area, _map);
-	_areas.append(ai);
-	_ar |= ai->area().boundingRect();
 	ai->setColor(_palette.nextColor());
 	ai->setWidth(_areaWidth);
 	ai->setStyle(_areaStyle);
 	ai->setOpacity(_areaOpacity);
 	ai->setDigitalZoom(_digitalZoom);
 	ai->setVisible(_showAreas);
+
 	_scene->addItem(ai);
+	_ar |= ai->bounds();
+	_areas.append(ai);
 
 	if (_showAreas)
-		addPOI(_poi->points(ai->area()));
+		addPOI(_poi->points(ai->bounds()));
 }
 
 void MapView::addWaypoints(const QVector<Waypoint> &waypoints)
@@ -200,7 +213,6 @@ void MapView::addWaypoints(const QVector<Waypoint> &waypoints)
 		wi->setSize(_waypointSize);
 		wi->setColor(_waypointColor);
 		wi->showLabel(_showWaypointLabels);
-		wi->setToolTipFormat(_units, _coordinatesFormat);
 		wi->setVisible(_showWaypoints);
 		wi->setDigitalZoom(_digitalZoom);
 		_scene->addItem(wi);
@@ -208,6 +220,26 @@ void MapView::addWaypoints(const QVector<Waypoint> &waypoints)
 		if (_showWaypoints)
 			addPOI(_poi->points(w));
 	}
+}
+
+MapItem *MapView::addMap(MapAction *map)
+{
+	MapItem *mi = new MapItem(map, _map);
+	mi->setColor(_palette.nextColor());
+	mi->setWidth(_areaWidth);
+	mi->setStyle(_areaStyle);
+	mi->setOpacity(_areaOpacity);
+	mi->setDigitalZoom(_digitalZoom);
+	mi->setVisible(_showAreas);
+
+	_scene->addItem(mi);
+	_ar |= mi->bounds();
+	_areas.append(mi);
+
+	if (_showAreas)
+		addPOI(_poi->points(mi->bounds()));
+
+	return mi;
 }
 
 QList<PathItem *> MapView::loadData(const Data &data)
@@ -232,9 +264,29 @@ QList<PathItem *> MapView::loadData(const Data &data)
 	else
 		updatePOIVisibility();
 
+	if (!data.areas().isEmpty())
+		updateZValues(_areas);
+
 	centerOn(contentCenter());
 
 	return paths;
+}
+
+void MapView::loadMaps(const QList<MapAction *> &maps)
+{
+	int zoom = _map->zoom();
+
+	for (int i = 0; i < maps.size(); i++)
+		addMap(maps.at(i));
+
+	if (fitMapZoom() != zoom)
+		rescale();
+	else
+		updatePOIVisibility();
+
+	updateZValues(_areas);
+
+	centerOn(contentCenter());
 }
 
 int MapView::fitMapZoom() const
@@ -242,8 +294,7 @@ int MapView::fitMapZoom() const
 	RectC br = _tr | _rr | _wr | _ar;
 
 	return _map->zoomFit(viewport()->size() - QSize(2*MARGIN, 2*MARGIN),
-	  br.isNull() ? RectC(_map->xy2ll(_map->bounds().topLeft()),
-	  _map->xy2ll(_map->bounds().bottomRight())) : br);
+	  br.isNull() ? _map->llBounds() : br);
 }
 
 QPointF MapView::contentCenter() const
@@ -320,10 +371,9 @@ void MapView::setMap(Map *map)
 
 	_map = map;
 	_map->load();
-	_map->setProjection(_projection);
-#ifdef ENABLE_HIDPI
+	_map->setOutputProjection(_outputProjection);
+	_map->setInputProjection(_inputProjection);
 	_map->setDevicePixelRatio(_deviceRatio, _mapRatio);
-#endif // ENABLE_HIDPI
 	connect(_map, SIGNAL(tilesLoaded()), this, SLOT(reloadMap()));
 
 	digitalZoom(0);
@@ -378,7 +428,7 @@ void MapView::updatePOI()
 			addPOI(_poi->points(_routes.at(i)->path()));
 	if (_showAreas)
 		for (int i = 0; i < _areas.size(); i++)
-			addPOI(_poi->points(_areas.at(i)->area()));
+			addPOI(_poi->points(_areas.at(i)->bounds()));
 	if (_showWaypoints)
 		for (int i = 0; i< _waypoints.size(); i++)
 			addPOI(_poi->points(_waypoints.at(i)->waypoint()));
@@ -401,7 +451,6 @@ void MapView::addPOI(const QList<Waypoint> &waypoints)
 		pi->showLabel(_showPOILabels);
 		pi->setVisible(_showPOI);
 		pi->setDigitalZoom(_digitalZoom);
-		pi->setToolTipFormat(_units, _coordinatesFormat);
 		_scene->addItem(pi);
 
 		_pois.insert(SearchPointer<Waypoint>(&(pi->waypoint())), pi);
@@ -410,42 +459,28 @@ void MapView::addPOI(const QList<Waypoint> &waypoints)
 
 void MapView::setUnits(Units units)
 {
-	if (_units == units)
-		return;
-
-	_units = units;
-
-	_mapScale->setUnits(_units);
+	WaypointItem::setUnits(units);
+	PathItem::setUnits(units);
 
 	for (int i = 0; i < _tracks.count(); i++)
-		_tracks[i]->setUnits(_units);
+		_tracks[i]->updateTicks();
 	for (int i = 0; i < _routes.count(); i++)
-		_routes[i]->setUnits(_units);
-	for (int i = 0; i < _waypoints.size(); i++)
-		_waypoints.at(i)->setToolTipFormat(_units, _coordinatesFormat);
+		_routes[i]->updateTicks();
 
-	for (POIHash::const_iterator it = _pois.constBegin();
-	  it != _pois.constEnd(); it++)
-		it.value()->setToolTipFormat(_units, _coordinatesFormat);
+	_mapScale->setUnits(units);
 }
 
 void MapView::setCoordinatesFormat(CoordinatesFormat format)
 {
-	if (_coordinatesFormat == format)
-		return;
+	WaypointItem::setCoordinatesFormat(format);
 
-	_coordinatesFormat = format;
+	_coordinates->setFormat(format);
+}
 
-	_coordinates->setFormat(_coordinatesFormat);
-
-	for (int i = 0; i < _waypoints.count(); i++)
-		_waypoints.at(i)->setToolTipFormat(_units, _coordinatesFormat);
-	for (int i = 0; i < _routes.count(); i++)
-		_routes[i]->setCoordinatesFormat(_coordinatesFormat);
-
-	for (POIHash::const_iterator it = _pois.constBegin();
-	  it != _pois.constEnd(); it++)
-		it.value()->setToolTipFormat(_units, _coordinatesFormat);
+void MapView::setTimeZone(const QTimeZone &zone)
+{
+	WaypointItem::setTimeZone(zone);
+	PathItem::setTimeZone(zone);
 }
 
 void MapView::clearMapCache()
@@ -480,10 +515,8 @@ void MapView::digitalZoom(int zoom)
 	_coordinates->setDigitalZoom(_digitalZoom);
 }
 
-void MapView::zoom(int zoom, const QPoint &pos)
+void MapView::zoom(int zoom, const QPoint &pos, bool shift)
 {
-	bool shift = QApplication::keyboardModifiers() & Qt::ShiftModifier;
-
 	if (_digitalZoom) {
 		if (((_digitalZoom > 0 && zoom > 0) && (!shift || _digitalZoom
 		  >= MAX_DIGITAL_ZOOM)) || ((_digitalZoom < 0 && zoom < 0) && (!shift
@@ -509,27 +542,42 @@ void MapView::zoom(int zoom, const QPoint &pos)
 void MapView::wheelEvent(QWheelEvent *event)
 {
 	static int deg = 0;
+	bool shift = (event->modifiers() & MODIFIER) ? true : false;
+	// Shift inverts the wheel axis on OS X, so use scrolling in both axes for
+	// the zoom.
+	int delta = event->angleDelta().y()
+	  ? event->angleDelta().y() : event->angleDelta().x();
 
-	deg += event->delta() / 8;
+	deg += delta / 8;
 	if (qAbs(deg) < 15)
 		return;
 	deg = 0;
 
-	zoom((event->delta() > 0) ? 1 : -1, event->pos());
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+	zoom((delta > 0) ? 1 : -1, event->pos(), shift);
+#else // QT 5.15
+	zoom((delta > 0) ? 1 : -1, event->position().toPoint(), shift);
+#endif // QT 5.15
 }
 
 void MapView::mouseDoubleClickEvent(QMouseEvent *event)
 {
+	bool shift = (event->modifiers() & MODIFIER) ? true : false;
+
+	QGraphicsView::mouseDoubleClickEvent(event);
+	if (event->isAccepted())
+		return;
+
 	if (event->button() != Qt::LeftButton && event->button() != Qt::RightButton)
 		return;
 
-	zoom((event->button() == Qt::LeftButton) ? 1 : -1, event->pos());
+	zoom((event->button() == Qt::LeftButton) ? 1 : -1, event->pos(), shift);
 }
 
 void MapView::keyPressEvent(QKeyEvent *event)
 {
 	int z;
-
+	bool shift = (event->modifiers() & MODIFIER) ? true : false;
 	QPoint pos = viewport()->rect().center();
 
 	if (event->key() == ZOOM_IN)
@@ -539,16 +587,39 @@ void MapView::keyPressEvent(QKeyEvent *event)
 	else if (_digitalZoom && event->key() == Qt::Key_Escape) {
 		digitalZoom(0);
 		return;
-	} else {
+	} else  {
+		if (event->key() == MODIFIER_KEY) {
+			_cursor = viewport()->cursor();
+			viewport()->setCursor(Qt::CrossCursor);
+		}
+
 		QGraphicsView::keyPressEvent(event);
 		return;
 	}
 
-	zoom(z, pos);
+	zoom(z, pos, shift);
+}
+
+void MapView::keyReleaseEvent(QKeyEvent *event)
+{
+	if (event->key() == MODIFIER_KEY
+	  && viewport()->cursor().shape() == Qt::CrossCursor)
+		viewport()->setCursor(_cursor);
+
+	QGraphicsView::keyReleaseEvent(event);
+}
+
+void MapView::mousePressEvent(QMouseEvent *event)
+{
+	if (event->button() == Qt::LeftButton && event->modifiers() & MODIFIER)
+		QApplication::clipboard()->setText(Format::coordinates(
+		  _map->xy2ll(mapToScene(event->pos())), _coordinates->format()));
+	else
+		QGraphicsView::mousePressEvent(event);
 }
 
 void MapView::plot(QPainter *painter, const QRectF &target, qreal scale,
-  bool hires)
+  PlotFlags flags)
 {
 	QRect orig, adj;
 	qreal ratio, diff, q;
@@ -559,9 +630,7 @@ void MapView::plot(QPainter *painter, const QRectF &target, qreal scale,
 	// Enter plot mode
 	setUpdatesEnabled(false);
 	_plot = true;
-#ifdef ENABLE_HIDPI
 	_map->setDevicePixelRatio(_deviceRatio, 1.0);
-#endif // ENABLE_HIDPI
 
 	// Compute sizes & ratios
 	orig = viewport()->rect();
@@ -576,10 +645,18 @@ void MapView::plot(QPainter *painter, const QRectF &target, qreal scale,
 		diff = (orig.height() * ratio) - orig.width();
 		adj = orig.adjusted(-diff/2, 0, diff/2, 0);
 	}
-	q = (target.width() / scale) / adj.width();
+
+	// Expand the view if plotting into a bitmap
+	if (flags & Expand) {
+		qreal xdiff = (target.width() - adj.width()) / 2.0;
+		qreal ydiff = (target.height() - adj.height()) / 2.0;
+		adj.adjust(-xdiff, -ydiff, xdiff, ydiff);
+		q = 1.0;
+	} else
+		q = (target.width() / scale) / adj.width();
 
 	// Adjust the view for printing
-	if (hires) {
+	if (flags & HiRes) {
 		zoom = _map->zoom();
 		QRectF vr(mapToScene(orig).boundingRect());
 		origScene = vr.center();
@@ -611,7 +688,7 @@ void MapView::plot(QPainter *painter, const QRectF &target, qreal scale,
 	render(painter, target, adj);
 
 	// Revert view changes to display mode
-	if (hires) {
+	if (flags & HiRes) {
 		_map->setZoom(zoom);
 		rescale();
 		centerOn(origScene);
@@ -620,9 +697,7 @@ void MapView::plot(QPainter *painter, const QRectF &target, qreal scale,
 	_mapScale->setPos(origPos);
 
 	// Exit plot mode
-#ifdef ENABLE_HIDPI
 	_map->setDevicePixelRatio(_deviceRatio, _mapRatio);
-#endif // ENABLE_HIDPI
 	_plot = false;
 	setUpdatesEnabled(true);
 }
@@ -944,7 +1019,7 @@ void MapView::useOpenGL(bool use)
 	_opengl = use;
 
 	if (use)
-		setViewport(new OPENGL_WIDGET);
+		setViewport(new QOpenGLWidget);
 	else
 		setViewport(new QWidget);
 }
@@ -971,7 +1046,6 @@ void MapView::reloadMap()
 
 void MapView::setDevicePixelRatio(qreal deviceRatio, qreal mapRatio)
 {
-#ifdef ENABLE_HIDPI
 	if (_deviceRatio == deviceRatio && _mapRatio == mapRatio)
 		return;
 
@@ -1004,26 +1078,40 @@ void MapView::setDevicePixelRatio(qreal deviceRatio, qreal mapRatio)
 	centerOn(nc);
 
 	reloadMap();
-#else // ENABLE_HIDPI
-	Q_UNUSED(deviceRatio);
-	Q_UNUSED(mapRatio);
-#endif // ENABLE_HIDPI
 }
 
-void MapView::setProjection(int id)
+void MapView::setOutputProjection(int id)
 {
 	const PCS *pcs;
 	const GCS *gcs;
 	Coordinates center = _map->xy2ll(mapToScene(viewport()->rect().center()));
 
 	if ((pcs = PCS::pcs(id)))
-		_projection = Projection(pcs);
+		_outputProjection = Projection(pcs);
 	else if ((gcs = GCS::gcs(id)))
-		_projection = Projection(gcs);
+		_outputProjection = Projection(gcs);
 	else
 		qWarning("%d: Unknown PCS/GCS id", id);
 
-	_map->setProjection(_projection);
+	_map->setOutputProjection(_outputProjection);
+	rescale();
+	centerOn(_map->ll2xy(center));
+}
+
+void MapView::setInputProjection(int id)
+{
+	const PCS *pcs;
+	const GCS *gcs;
+	Coordinates center = _map->xy2ll(mapToScene(viewport()->rect().center()));
+
+	if ((pcs = PCS::pcs(id)))
+		_inputProjection = Projection(pcs);
+	else if ((gcs = GCS::gcs(id)))
+		_inputProjection = Projection(gcs);
+	else
+		qWarning("%d: Unknown PCS/GCS id", id);
+
+	_map->setInputProjection(_inputProjection);
 	rescale();
 	centerOn(_map->ll2xy(center));
 }

@@ -17,7 +17,7 @@ static void expand(QRect &rect, int width)
 
 TextPointItem::TextPointItem(const QPoint &point, const QString *text,
   const QFont *font, const QImage *img, const QColor *color,
-  const QColor *bgColor) : _text(font ? text : 0), _font(font), _img(img),
+  const QColor *bgColor) : TextItem(font ? text : 0), _font(font), _img(img),
   _color(color), _bgColor(bgColor)
 {
 	if (_text) {
@@ -87,14 +87,8 @@ void TextPointItem::paint(QPainter *painter) const
 				painter->setPen(*_color);
 				painter->drawText(_textRect, FLAGS, *_text);
 			} else {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
 				img.invertPixels();
 				painter->drawImage(_textRect, img);
-#else // QT >= 5.4
-				QImage iimg(img.convertToFormat(QImage::Format_ARGB32));
-				iimg.invertPixels();
-				painter->drawImage(_textRect, iimg);
-#endif // QT >= 5.4
 			}
 		}
 	}

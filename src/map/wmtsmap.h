@@ -14,12 +14,13 @@ class WMTSMap : public Map
 	Q_OBJECT
 
 public:
-	WMTSMap(const QString &name, const WMTS::Setup &setup, qreal tileRatio,
-	  QObject *parent = 0);
+	WMTSMap(const QString &fileName, const QString &name,
+	  const WMTS::Setup &setup, qreal tileRatio, QObject *parent = 0);
 
 	QString name() const {return _name;}
 
 	QRectF bounds();
+	RectC llBounds();
 
 	int zoom() const {return _zoom;}
 	void setZoom(int zoom);
@@ -45,6 +46,8 @@ private slots:
 
 private:
 	double sd2res(double scaleDenominator) const;
+	Transform transform(int zoom) const;
+	QRectF tileBounds(int zoom) const;
 	void updateTransform();
 	QSizeF tileSize(const WMTS::Zoom &zoom) const;
 	qreal coordinatesRatio() const;

@@ -8,6 +8,7 @@
 #define PREV_KEY                Qt::Key_Backspace
 #define FIRST_KEY               Qt::Key_Home
 #define LAST_KEY                Qt::Key_End
+#define MODIFIER_KEY            Qt::Key_Shift
 #define MODIFIER                Qt::ShiftModifier
 #define ZOOM_IN                 Qt::Key_Plus
 #define ZOOM_OUT                Qt::Key_Minus
@@ -18,7 +19,8 @@
 #define OPEN_SHORTCUT           QKeySequence(QKeySequence::Open)
 #define CLOSE_SHORTCUT          QKeySequence(QKeySequence::Close)
 #define RELOAD_SHORTCUT         QKeySequence(QKeySequence::Refresh)
-#define EXPORT_SHORTCUT         QKeySequence(Qt::CTRL + Qt::Key_E)
+#define PDF_EXPORT_SHORTCUT     QKeySequence(Qt::CTRL + Qt::Key_E)
+#define PNG_EXPORT_SHORTCUT     QKeySequence(Qt::CTRL + Qt::Key_X)
 #define SHOW_POI_SHORTCUT       QKeySequence(Qt::CTRL + Qt::Key_P)
 #define SHOW_MAP_SHORTCUT       QKeySequence(Qt::CTRL + Qt::Key_M)
 #define NEXT_MAP_SHORTCUT       QKeySequence(QKeySequence::Forward)

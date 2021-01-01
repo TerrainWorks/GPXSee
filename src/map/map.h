@@ -5,11 +5,10 @@
 #include <QString>
 #include <QRectF>
 #include <QFlags>
-#include "common/coordinates.h"
+#include "common/rectc.h"
 
 
 class QPainter;
-class RectC;
 class Projection;
 
 class Map : public QObject
@@ -24,11 +23,14 @@ public:
 	};
 	Q_DECLARE_FLAGS(Flags, Flag)
 
-	Map(QObject *parent = 0) : QObject(parent) {}
+	Map(const QString &path, QObject *parent = 0)
+	  : QObject(parent), _path(path) {}
 	virtual ~Map() {}
 
+	const QString &path() const {return _path;}
 	virtual QString name() const = 0;
 
+	virtual RectC llBounds();
 	virtual QRectF bounds() = 0;
 	virtual qreal resolution(const QRectF &rect);
 
@@ -47,7 +49,8 @@ public:
 	virtual void load() {}
 	virtual void unload() {}
 	virtual void setDevicePixelRatio(qreal, qreal) {}
-	virtual void setProjection(const Projection &) {}
+	virtual void setOutputProjection(const Projection &) {}
+	virtual void setInputProjection(const Projection &) {}
 
 	virtual bool isValid() const {return true;}
 	virtual bool isReady() const {return true;}
@@ -56,6 +59,14 @@ public:
 signals:
 	void tilesLoaded();
 	void mapLoaded();
+
+private:
+	void growLeft(const QPointF &p, RectC &rect);
+	void growRight(const QPointF &p, RectC &rect);
+	void growTop(const QPointF &p, RectC &rect);
+	void growBottom(const QPointF &p, RectC &rect);
+
+	QString _path;
 };
 
 Q_DECLARE_METATYPE(Map*)

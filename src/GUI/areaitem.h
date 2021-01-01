@@ -2,12 +2,9 @@
 #define AREAITEM_H
 
 #include "data/area.h"
-#include "graphicsscene.h"
-#include "tooltip.h"
+#include "planeitem.h"
 
-class Map;
-
-class AreaItem : public GraphicsItem
+class AreaItem : public PlaneItem
 {
 public:
 	AreaItem(const Area &area, Map *map, GraphicsItem *parent = 0);
@@ -19,6 +16,7 @@ public:
 
 	const Area &area() const {return _area;}
 
+	RectC bounds() const {return _area.boundingRect();}
 	void setMap(Map *map);
 
 	void setColor(const QColor &color);
@@ -27,17 +25,15 @@ public:
 	void setStyle(Qt::PenStyle style);
 	void setDigitalZoom(int zoom);
 
-	virtual QString info() const;
+	QString info() const;
 
 protected:
 	void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
 	void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
-	void mousePressEvent(QGraphicsSceneMouseEvent *event);
 
 private:
 	QPainterPath painterPath(const Polygon &polygon);
 	void updatePainterPath();
-	ToolTip toolTip() const;
 
 	Area _area;
 	Map *_map;

@@ -3,11 +3,7 @@
 #include <QEventLoop>
 #include <QPixmapCache>
 #include <QImageReader>
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-#include <QtCore>
-#else // QT_VERSION < 5
 #include <QtConcurrent>
-#endif // QT_VERSION < 5
 #include "tileloader.h"
 
 
@@ -40,11 +36,6 @@ private:
 	int _scaledSize;
 	QImage _image;
 };
-
-static void render(TileImage &ti)
-{
-	ti.load();
-}
 
 static QString quadKey(const QPoint &xy, int zoom)
 {
@@ -82,7 +73,7 @@ void TileLoader::loadTilesAsync(QVector<Tile> &list)
 		Tile &t = list[i];
 		QString file(tileFile(t));
 
-		if (QPixmapCache::find(file, t.pixmap()))
+		if (QPixmapCache::find(file, &t.pixmap()))
 			continue;
 
 		QFileInfo fi(file);
@@ -101,7 +92,7 @@ void TileLoader::loadTilesAsync(QVector<Tile> &list)
 	if (!dl.empty())
 		_downloader->get(dl, _authorization);
 
-	QFuture<void> future = QtConcurrent::map(imgs, render);
+	QFuture<void> future = QtConcurrent::map(imgs, &TileImage::load);
 	future.waitForFinished();
 
 	for (int i = 0; i < imgs.size(); i++) {
@@ -121,7 +112,7 @@ void TileLoader::loadTilesSync(QVector<Tile> &list)
 		Tile &t = list[i];
 		QString file(tileFile(t));
 
-		if (QPixmapCache::find(file, t.pixmap()))
+		if (QPixmapCache::find(file, &t.pixmap()))
 			continue;
 
 		QFileInfo fi(file);
@@ -153,7 +144,7 @@ void TileLoader::loadTilesSync(QVector<Tile> &list)
 		}
 	}
 
-	QFuture<void> future = QtConcurrent::map(imgs, render);
+	QFuture<void> future = QtConcurrent::map(imgs, &TileImage::load);
 	future.waitForFinished();
 
 	for (int i = 0; i < imgs.size(); i++)

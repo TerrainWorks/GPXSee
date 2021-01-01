@@ -1,23 +1,22 @@
 #ifndef HUFFMANTABLE_H
 #define HUFFMANTABLE_H
 
-#include "subfile.h"
+#include "huffmanbuffer.h"
+
+class RGNFile;
 
 class HuffmanTable {
 public:
-	HuffmanTable() : _s2(0) {}
+	HuffmanTable(quint8 id) : _buffer(id) {}
 
-	bool load(const SubFile &file, SubFile::Handle &hdl, quint32 offset,
-	  quint32 size, quint32 id);
-	bool isNull() const {return _s2 == 0;}
+	bool load(const RGNFile *rgn, SubFile::Handle &rgnHdl);
 	quint8 maxSymbolSize() const {return _s2;}
 	quint32 symbol(quint32 data, quint8 &size) const;
 
-private:
-	bool getBuffer(const SubFile &file, SubFile::Handle &hdl, quint32 offset,
-	  quint32 size, quint8 id);
+	quint8 id() const {return _buffer.id();}
 
-	QByteArray _buffer;
+private:
+	HuffmanBuffer _buffer;
 	quint8 _s0, _s1, _s2, _s3;
 	quint8 *_s10, *_s14, *_s18;
 	quint8 _s1c, _s1d, _s1e, _s1f, _s20;

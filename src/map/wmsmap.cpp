@@ -67,8 +67,9 @@ void WMSMap::updateTransform()
 	  PointD(pixelSpan, pixelSpan));
 }
 
-WMSMap::WMSMap(const QString &name, const WMS::Setup &setup, int tileSize,
-  QObject *parent) : Map(parent), _name(name), _tileLoader(0), _zoom(0),
+WMSMap::WMSMap(const QString &fileName, const QString &name,
+  const WMS::Setup &setup, int tileSize, QObject *parent)
+  : Map(fileName, parent), _name(name), _tileLoader(0), _zoom(0),
   _tileSize(tileSize), _mapRatio(1.0)
 {
 	QString tilesDir(QDir(ProgramPaths::tilesDir()).filePath(_name));
@@ -199,9 +200,7 @@ void WMSMap::draw(QPainter *painter, const QRectF &rect, Flags flags)
 		Tile &t = tiles[i];
 		QPointF tp(t.xy().x() * tileSize(), t.xy().y() * tileSize());
 		if (!t.pixmap().isNull()) {
-#ifdef ENABLE_HIDPI
 			t.pixmap().setDevicePixelRatio(_mapRatio);
-#endif // ENABLE_HIDPI
 			painter->drawPixmap(tp, t.pixmap());
 		}
 	}

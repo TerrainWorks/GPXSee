@@ -20,11 +20,15 @@ Projection CRS::projection(const QString &crs)
 			authority = list.at(4);
 			code = list.at(6);
 			break;
+		case 8:
+			authority = list.at(4);
+			code = list.at(7);
+			break;
 		default:
 			return Projection();
 	}
 
-	if (authority == "EPSG") {
+	if (!authority.compare("EPSG", Qt::CaseInsensitive)) {
 		epsg = code.toInt(&res);
 		if (!res)
 			return Projection();
@@ -35,7 +39,7 @@ Projection CRS::projection(const QString &crs)
 			return Projection(gcs);
 		else
 			return Projection();
-	} else if (authority == "OGC") {
+	} else if (!authority.compare("OGC", Qt::CaseInsensitive)) {
 		if (code == "CRS84")
 			return Projection(GCS::gcs(4326), CoordinateSystem::XY);
 		else

@@ -10,11 +10,13 @@
 #include "rmap.h"
 #include "imgmap.h"
 #include "IMG/gmap.h"
+#include "bsbmap.h"
+#include "kmzmap.h"
+#include "invalidmap.h"
 #include "maplist.h"
 
 
-Map *MapList::loadFile(const QString &path, QString &errorString,
-  bool *terminate)
+Map *MapList::loadFile(const QString &path, bool *terminate)
 {
 	QFileInfo fi(path);
 	QString suffix = fi.suffix().toLower();
@@ -26,12 +28,11 @@ Map *MapList::loadFile(const QString &path, QString &errorString,
 		map = new Atlas(path);
 	} else if (suffix == "xml") {
 		if (MapSource::isMap(path)) {
-			if (!(map = MapSource::loadMap(path, errorString)))
-				return 0;
+			map = MapSource::loadMap(path);
 		} else if (GMAP::isGMAP(path)) {
+			map = new IMGMap(path);
 			if (terminate)
 				*terminate = true;
-			map = new IMGMap(path);
 		}
 	} else if (suffix == "jnx")
 		map = new JNXMap(path);
@@ -45,17 +46,15 @@ Map *MapList::loadFile(const QString &path, QString &errorString,
 		map = new IMGMap(path);
 	else if (suffix == "map" || suffix == "tar")
 		map = new OziMap(path);
+	else if (suffix == "kap")
+		map = new BSBMap(path);
+	else if (suffix == "kmz")
+		map = new KMZMap(path);
 
-	if (map && map->isValid())
-		return map;
-	else {
-		errorString = (map) ? map->errorString() : "Unknown file format";
-		delete map;
-		return 0;
-	}
+	return map ? map : new InvalidMap(path, "Unknown file format");
 }
 
-QList<Map*> MapList::loadDir(const QString &path, QString &errorString)
+QList<Map*> MapList::loadDir(const QString &path)
 {
 	QDir md(path);
 	md.setFilter(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
@@ -69,14 +68,9 @@ QList<Map*> MapList::loadDir(const QString &path, QString &errorString)
 		bool terminate = false;
 
 		if (fi.isDir() && fi.fileName() != "set")
-			list.append(loadDir(fi.absoluteFilePath(), errorString));
+			list.append(loadDir(fi.absoluteFilePath()));
 		else if (filter().contains("*." + suffix)) {
-			Map *map = loadFile(fi.absoluteFilePath(), errorString, &terminate);
-			if (map)
-				list.append(map);
-			else
-				qWarning("%s: %s", qPrintable(fi.absoluteFilePath()),
-				  qPrintable(errorString));
+			list.append(loadFile(fi.absoluteFilePath(), &terminate));
 			if (terminate)
 				break;
 		}
@@ -85,15 +79,13 @@ QList<Map*> MapList::loadDir(const QString &path, QString &errorString)
 	return list;
 }
 
-QList<Map*> MapList::loadMaps(const QString &path, QString &errorString)
+QList<Map*> MapList::loadMaps(const QString &path)
 {
 	if (QFileInfo(path).isDir())
-		return loadDir(path, errorString);
+		return loadDir(path);
 	else {
 		QList<Map*> list;
-		Map *map = loadFile(path, errorString, 0);
-		if (map)
-			list.append(map);
+		list.append(loadFile(path, 0));
 		return list;
 	}
 }
@@ -106,6 +98,8 @@ QString MapList::formats()
 	  + qApp->translate("MapList", "Garmin IMG maps")
 		+ " (*.gmap *.gmapi *.img *.xml);;"
 	  + qApp->translate("MapList", "Garmin JNX maps") + " (*.jnx);;"
+	  + qApp->translate("MapList", "BSB nautical charts") + " (*.kap);;"
+	  + qApp->translate("MapList", "KMZ maps") + " (*.kmz);;"
 	  + qApp->translate("MapList", "OziExplorer maps") + " (*.map);;"
 	  + qApp->translate("MapList", "MBTiles maps") + " (*.mbtiles);;"
 	  + qApp->translate("MapList", "TrekBuddy maps/atlases") + " (*.tar *.tba);;"
@@ -117,8 +111,8 @@ QString MapList::formats()
 QStringList MapList::filter()
 {
 	QStringList filter;
-	filter << "*.gmap" << "*.gmapi" << "*.img" << "*.jnx" << "*.map"
-	  << "*.mbtiles" << "*.rmap" << "*.rtmap" << "*.tar" << "*.tba" << "*.tif"
-	  << "*.tiff"  << "*.xml";
+	filter << "*.gmap" << "*.gmapi" << "*.img" << "*.jnx" << "*.kap" << "*.kmz"
+	  << "*.map" << "*.mbtiles" << "*.rmap" << "*.rtmap" << "*.tar" << "*.tba"
+	  << "*.tif" << "*.tiff"  << "*.xml";
 	return filter;
 }

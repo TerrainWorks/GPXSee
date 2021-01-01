@@ -8,6 +8,7 @@
 #include "krovak.h"
 #include "polarstereographic.h"
 #include "obliquestereographic.h"
+#include "polyconic.h"
 #include "latlon.h"
 #include "gcs.h"
 #include "pcs.h"
@@ -25,6 +26,7 @@ Projection::Method::Method(int id)
 		case 9807:
 		case 9809:
 		case 9815:
+		case 9818:
 		case 9819:
 		case 9820:
 		case 9822:
@@ -36,9 +38,15 @@ Projection::Method::Method(int id)
 	}
 }
 
-Projection::Projection(const PCS *pcs) : _gcs(pcs->gcs()), _units(pcs->units()),
-	_cs(pcs->coordinateSystem()), _geographic(false)
+Projection::Projection(const PCS *pcs) : _gcs(0), _ct(0), _geographic(false)
 {
+	if (!pcs)
+		return;
+
+	_gcs = pcs->gcs();
+	_units = pcs->units();
+	_cs = pcs->coordinateSystem();
+
 	const Ellipsoid *ellipsoid = _gcs->datum().ellipsoid();
 	const Projection::Setup &setup = pcs->setup();
 
@@ -79,6 +87,11 @@ Projection::Projection(const PCS *pcs) : _gcs(pcs->gcs()), _units(pcs->units()),
 			  setup.longitudeOrigin(), setup.scale(), setup.falseEasting(),
 			  setup.falseNorthing());
 			break;
+		case 9818:
+			_ct = new Polyconic(ellipsoid, setup.latitudeOrigin(),
+			  setup.longitudeOrigin(), setup.falseEasting(),
+			  setup.falseNorthing());
+			break;
 		case 9819:
 			_ct = new Krovak(ellipsoid, setup.standardParallel1(),
 			  setup.standardParallel2(), setup.scale(), setup.latitudeOrigin(),
@@ -107,8 +120,11 @@ Projection::Projection(const PCS *pcs) : _gcs(pcs->gcs()), _units(pcs->units()),
 }
 
 Projection::Projection(const GCS *gcs, const CoordinateSystem &cs)
-  : _gcs(gcs), _units(LinearUnits(9001)), _cs(cs), _geographic(true)
+  : _gcs(gcs), _ct(0), _units(LinearUnits(9001)), _cs(cs), _geographic(true)
 {
+	if (!gcs)
+		return;
+
 	_ct = new LatLon(gcs->angularUnits());
 }
 
@@ -139,6 +155,15 @@ Projection &Projection::operator=(const Projection &p)
 	}
 
 	return *this;
+}
+
+bool Projection::operator==(const Projection &p) const
+{
+	if (!isValid() || !p.isValid())
+		return false;
+
+	return (*_ct == *p._ct && *_gcs == *p._gcs && _units == p._units
+	  && _cs == p._cs && _geographic == p._geographic);
 }
 
 PointD Projection::ll2xy(const Coordinates &c) const

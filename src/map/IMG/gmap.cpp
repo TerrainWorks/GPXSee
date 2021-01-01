@@ -1,6 +1,5 @@
 #include <QXmlStreamReader>
 #include <QDir>
-#include "map/osm.h"
 #include "vectortile.h"
 #include "gmap.h"
 
@@ -27,9 +26,9 @@ void GMAP::subProduct(QXmlStreamReader &reader, QString &dataDir,
   QString &baseMap)
 {
 	while (reader.readNextStartElement()) {
-		if (reader.name() == "Directory")
+		if (reader.name() == QLatin1String("Directory"))
 			dataDir = reader.readElementText();
-		else if (reader.name() == "BaseMap")
+		else if (reader.name() == QLatin1String("BaseMap"))
 			baseMap = reader.readElementText();
 		else
 			reader.skipCurrentElement();
@@ -40,11 +39,11 @@ void GMAP::mapProduct(QXmlStreamReader &reader, QString &dataDir,
   QString &typFile, QString &baseMap)
 {
 	while (reader.readNextStartElement()) {
-		if (reader.name() == "Name")
+		if (reader.name() == QLatin1String("Name"))
 			_name = reader.readElementText();
-		else if (reader.name() == "TYP")
+		else if (reader.name() == QLatin1String("TYP"))
 			typFile = reader.readElementText();
-		else if (reader.name() == "SubProduct")
+		else if (reader.name() == QLatin1String("SubProduct"))
 			subProduct(reader, dataDir, baseMap);
 		else
 			reader.skipCurrentElement();
@@ -61,7 +60,7 @@ bool GMAP::readXML(const QString &path, QString &dataDir, QString &typFile,
 
 	QXmlStreamReader reader(&file);
 	if (reader.readNextStartElement()) {
-		if (reader.name() == "MapProduct")
+		if (reader.name() == QLatin1String("MapProduct"))
 			mapProduct(reader, dataDir, typFile, baseMap);
 		else
 			reader.raiseError("Not a GMAP XML file");
@@ -82,7 +81,11 @@ bool GMAP::loadTile(const QDir &dir, bool baseMap)
 	QFileInfoList ml = dir.entryInfoList(QDir::Files);
 	for (int i = 0; i < ml.size(); i++) {
 		const QFileInfo &fi = ml.at(i);
-		tile->addFile(fi.absoluteFilePath(), tileType(fi.suffix()));
+		SubFile::Type tt = tileType(fi.suffix());
+		if (VectorTile::isTileFile(tt)) {
+			_files.append(new QString(fi.absoluteFilePath()));
+			tile->addFile(_files.last(), tt);
+		}
 	}
 
 	if (!tile->init()) {
@@ -103,11 +106,6 @@ bool GMAP::loadTile(const QDir &dir, bool baseMap)
 	_bounds |= tile->bounds();
 	if (tile->zooms().min() < _zooms.min())
 		_zooms.setMin(tile->zooms().min());
-
-	// Limit world maps bounds so that the maps can be projected using
-	// the default Web Mercator projection
-	if (_bounds.height() > 120)
-		_bounds &= OSM::BOUNDS;
 
 	return true;
 }
@@ -137,13 +135,20 @@ GMAP::GMAP(const QString &fileName) : _fileName(fileName)
 			  fi.absoluteFilePath() == baseMap.absoluteFilePath());
 	}
 
-	if (baseDir.exists(typFilePath))
-		_typ = new SubFile(baseDir.filePath(typFilePath));
+	if (baseDir.exists(typFilePath)) {
+		_files.append(new QString(baseDir.filePath(typFilePath)));
+		_typ = new SubFile(_files.last());
+	}
 
 	if (!_tileTree.Count())
 		_errorString = "No usable map tile found";
 	else
 		_valid = true;
+}
+
+GMAP::~GMAP()
+{
+	qDeleteAll(_files);
 }
 
 bool GMAP::isGMAP(const QString &path)
@@ -154,7 +159,8 @@ bool GMAP::isGMAP(const QString &path)
 		return false;
 
 	QXmlStreamReader reader(&file);
-	if (reader.readNextStartElement() && reader.name() == "MapProduct")
+	if (reader.readNextStartElement()
+	  && reader.name() == QLatin1String("MapProduct"))
 		return true;
 
 	return false;

@@ -15,7 +15,8 @@ public:
 	bool isNull() const
 	  {return _tl.isNull() && _br.isNull();}
 	bool isValid() const
-	  {return (_tl.isValid() && _br.isValid() && _tl != _br);}
+	  {return (_tl.isValid() && _br.isValid()
+	  && _tl.lat() != _br.lat() && _tl.lon() != _br.lon());}
 
 	Coordinates topLeft() const {return _tl;}
 	Coordinates bottomRight() const {return _br;}
@@ -23,13 +24,17 @@ public:
 	  {return Coordinates((_tl.lon() + _br.lon()) / 2.0,
 	    (_tl.lat() + _br.lat()) / 2.0);}
 
+	double width() const
+	{
+		double res = right() - left();
+		return (left() > right()) ? 360.0 - res : res;
+	}
+	double height() const {return (top() - bottom());}
+
 	double top() const {return _tl.lat();}
 	double bottom() const {return _br.lat();}
 	double left() const {return _tl.lon();}
 	double right() const {return _br.lon();}
-
-	double width() const {return (right() - left());}
-	double height() const {return (top() - bottom());}
 
 	void setLeft(double val) {_tl.rlon() = val;}
 	void setRight(double val) {_br.rlon() = val;}
@@ -42,6 +47,7 @@ public:
 	RectC &operator&=(const RectC &r) {*this = *this & r; return *this;}
 
 	RectC united(const Coordinates &c) const;
+	RectC adjusted(double lon1, double lat1, double lon2, double lat2) const;
 
 	bool intersects(const RectC &r) const
 	  {return (right() >= r.left() && bottom() <= r.top() && left() <= r.right()

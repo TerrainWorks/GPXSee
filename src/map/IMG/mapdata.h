@@ -21,7 +21,7 @@ public:
 	struct Poly {
 		/* QPointF insted of Coordinates for performance reasons (no need to
 		   duplicate all the vectors for drawing). Note, that we do not want to
-		   ll2xy() the points in the IMG class as this can not be done in
+		   ll2xy() the points in the MapData class as this can not be done in
 		   parallel. */
 		QVector<QPointF> points;
 		Label label;
@@ -38,20 +38,10 @@ public:
 		Coordinates coordinates;
 		Label label;
 		quint32 type;
-		bool poi;
 		quint64 id;
 
 		bool operator<(const Point &other) const
 		  {return id < other.id;}
-	};
-
-	struct Polys {
-		Polys() {}
-		Polys(const QList<Poly> &polygons, const QList<Poly> &lines)
-			: polygons(polygons), lines(lines) {}
-
-		QList<Poly> polygons;
-		QList<Poly> lines;
 	};
 
 	MapData();
@@ -88,21 +78,32 @@ protected:
 	QString _errorString;
 
 private:
+	struct Polys {
+		Polys() {}
+		Polys(const QList<Poly> &polygons, const QList<Poly> &lines)
+			: polygons(polygons), lines(lines) {}
+
+		QList<Poly> polygons;
+		QList<Poly> lines;
+	};
+
 	QCache<const SubDiv*, Polys> _polyCache;
 	QCache<const SubDiv*, QList<Point> > _pointCache;
+
+	friend class VectorTile;
+	friend struct PolyCTX;
 };
 
 #ifndef QT_NO_DEBUG
 inline QDebug operator<<(QDebug dbg, const MapData::Point &point)
 {
-	dbg.nospace() << "Point(" << hex << point.type << ", " << point.label
-	  << ", " << point.poi << ")";
+	dbg.nospace() << "Point(" << point.type << ", " << point.label << ")";
 	return dbg.space();
 }
 
 inline QDebug operator<<(QDebug dbg, const MapData::Poly &poly)
 {
-	dbg.nospace() << "Poly(" << hex << poly.type << ", " << poly.label << ")";
+	dbg.nospace() << "Poly(" << poly.type << ", " << poly.label << ")";
 	return dbg.space();
 }
 #endif // QT_NO_DEBUG

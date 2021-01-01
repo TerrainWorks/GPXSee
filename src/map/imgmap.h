@@ -6,7 +6,6 @@
 #include "transform.h"
 #include "IMG/mapdata.h"
 
-class TextItem;
 
 class IMGMap : public Map
 {
@@ -14,24 +13,27 @@ class IMGMap : public Map
 
 public:
 	IMGMap(const QString &fileName, QObject *parent = 0);
-	~IMGMap() {delete _data;}
+	~IMGMap() {qDeleteAll(_data);}
 
-	QString name() const {return _data->name();}
+	QString name() const {return _data.first()->name();}
 
 	QRectF bounds() {return _bounds;}
+	RectC llBounds() {return _dataBounds;}
 
-	virtual int zoom() const {return _zoom;}
-	virtual void setZoom(int zoom);
-	virtual int zoomFit(const QSize &, const RectC &);
-	virtual int zoomIn();
-	virtual int zoomOut();
+	int zoom() const {return _zoom;}
+	void setZoom(int zoom);
+	int zoomFit(const QSize &, const RectC &);
+	int zoomIn();
+	int zoomOut();
 
-	QPointF ll2xy(const Coordinates &c);
-	Coordinates xy2ll(const QPointF &p);
+	QPointF ll2xy(const Coordinates &c)
+	  {return _transform.proj2img(_projection.ll2xy(c));}
+	Coordinates xy2ll(const QPointF &p)
+	  {return _projection.xy2ll(_transform.img2proj(p));}
 
 	void draw(QPainter *painter, const QRectF &rect, Flags flags);
 
-	void setProjection(const Projection &projection);
+	void setOutputProjection(const Projection &projection);
 
 	void load();
 	void unload();
@@ -40,29 +42,15 @@ public:
 	QString errorString() const {return _errorString;}
 
 private:
-	friend class RasterTile;
-
 	Transform transform(int zoom) const;
 	void updateTransform();
-	void drawPolygons(QPainter *painter, const QList<MapData::Poly> &polygons);
-	void drawLines(QPainter *painter, const QList<MapData::Poly> &lines);
-	void drawTextItems(QPainter *painter, const QList<TextItem*> &textItems);
 
-	void processPolygons(QList<MapData::Poly> &polygons,
-	  QList<TextItem *> &textItems);
-	void processLines(QList<MapData::Poly> &lines, const QRect &tileRect,
-	  QList<TextItem*> &textItems);
-	void processPoints(QList<MapData::Point> &points, QList<TextItem*> &textItems);
-	void processShields(QList<MapData::Poly> &lines, const QRect &tileRect,
-	  QList<TextItem*> &textItems);
-	void processStreetNames(QList<MapData::Poly> &lines, const QRect &tileRect,
-	  QList<TextItem*> &textItems);
-
-	MapData *_data;
+	QList<MapData *> _data;
 	int _zoom;
 	Projection _projection;
 	Transform _transform;
 	QRectF _bounds;
+	RectC _dataBounds;
 
 	bool _valid;
 	QString _errorString;

@@ -1,7 +1,29 @@
+// TITLE
+//
+//    R-TREES: A DYNAMIC INDEX STRUCTURE FOR SPATIAL SEARCHING
+//
+// DESCRIPTION
+//
+//    A C++ templated version of the RTree algorithm.
+//    For more information please read the comments in RTree.h
+//
+// AUTHORS
+//
+//    * 1983 Original algorithm and test code by Antonin Guttman
+//      and Michael Stonebraker, UC Berkely
+//    * 1994 ANSI C ported from original test code by Melinda Green
+//      (melinda@superliminal.com)
+//    * 1995 Sphere volume fix for degeneracy problem submitted by Paul Brook
+//    * 2004 Templated C++ port by Greg Douglas
+//    * 2018 Iterator fix and Qt macros by Martin Tuma
+//
+// LICENSE:
+//
+//    Entirely free for all uses. Enjoy!
+
 #ifndef RTREE_H
 #define RTREE_H
 
-#include <cstdio>
 #include <cmath>
 #include <cstdlib>
 #include <QtGlobal>
@@ -387,10 +409,10 @@ RTREE_TEMPLATE
 void RTREE_QUAL::Insert(const ELEMTYPE a_min[NUMDIMS],
   const ELEMTYPE a_max[NUMDIMS], const DATATYPE& a_dataId)
 {
-	#ifdef _DEBUG
+	#ifndef QT_NO_DEBUG
 	for (int index=0; index<NUMDIMS; ++index)
 		Q_ASSERT(a_min[index] <= a_max[index]);
-	#endif //_DEBUG
+	#endif // QT_NO_DEBUG
 
 	Rect rect;
 
@@ -407,10 +429,10 @@ RTREE_TEMPLATE
 void RTREE_QUAL::Remove(const ELEMTYPE a_min[NUMDIMS],
   const ELEMTYPE a_max[NUMDIMS], const DATATYPE& a_dataId)
 {
-	#ifdef _DEBUG
+	#ifndef QT_NO_DEBUG
 	for (int index=0; index<NUMDIMS; ++index)
 		Q_ASSERT(a_min[index] <= a_max[index]);
-	#endif //_DEBUG
+	#endif // QT_NO_DEBUG
 
 	Rect rect;
 
@@ -427,10 +449,10 @@ RTREE_TEMPLATE
 int RTREE_QUAL::Search(const ELEMTYPE a_min[NUMDIMS], const ELEMTYPE a_max[NUMDIMS],
   bool a_resultCallback(DATATYPE a_data, void* a_context), void* a_context) const
 {
-	#ifdef _DEBUG
+	#ifndef QT_NO_DEBUG
 	for (int index=0; index<NUMDIMS; ++index)
 		Q_ASSERT(a_min[index] <= a_max[index]);
-	#endif //_DEBUG
+	#endif // QT_NO_DEBUG
 
 	Rect rect;
 
@@ -636,10 +658,10 @@ bool RTREE_QUAL::InsertRect(Rect* a_rect, const DATATYPE& a_id, Node** a_root,
 {
 	Q_ASSERT(a_rect && a_root);
 	Q_ASSERT(a_level >= 0 && a_level <= (*a_root)->m_level);
-	#ifdef _DEBUG
+	#ifndef QT_NO_DEBUG
 	for (int index=0; index < NUMDIMS; ++index)
 		Q_ASSERT(a_rect->m_min[index] <= a_rect->m_max[index]);
-	#endif //_DEBUG  
+	#endif // QT_NO_DEBUG
 
 	Node* newRoot;
 	Node* newNode;

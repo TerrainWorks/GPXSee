@@ -4,6 +4,7 @@
 #include <cmath>
 #include <QGraphicsItem>
 #include <QFont>
+#include <QTimeZone>
 #include "data/waypoint.h"
 #include "map/map.h"
 #include "units.h"
@@ -23,7 +24,6 @@ public:
 	void setColor(const QColor &color);
 	void showLabel(bool show);
 	void setDigitalZoom(int zoom) {setScale(pow(2, -zoom));}
-	void setToolTipFormat(Units units, CoordinatesFormat format);
 
 	QPainterPath shape() const {return _shape;}
 	QRectF boundingRect() const {return _shape.boundingRect();}
@@ -31,6 +31,11 @@ public:
 	  QWidget *widget);
 
 	QString info() const;
+
+	static void setUnits(Units units) {_units = units;}
+	static void setCoordinatesFormat(CoordinatesFormat format)
+	  {_format = format;}
+	static void setTimeZone(const QTimeZone &zone) {_timeZone = zone;}
 
 protected:
 	void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
@@ -48,8 +53,9 @@ private:
 	QFont _font;
 	QRect _labelBB;
 
-	Units _units;
-	CoordinatesFormat _format;
+	static Units _units;
+	static CoordinatesFormat _format;
+	static QTimeZone _timeZone;
 };
 
 #endif // WAYPOINTITEM_H

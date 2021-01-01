@@ -8,11 +8,11 @@
 #include "onlinemap.h"
 
 
-OnlineMap::OnlineMap(const QString &name, const QString &url,
-  const Range &zooms, const RectC &bounds, qreal tileRatio,
+OnlineMap::OnlineMap(const QString &fileName, const QString &name,
+  const QString &url, const Range &zooms, const RectC &bounds, qreal tileRatio,
   const Authorization &authorization, int tileSize, bool scalable, bool invertY,
   bool quadTiles, QObject *parent)
-	: Map(parent), _name(name), _zooms(zooms), _bounds(bounds),
+    : Map(fileName, parent), _name(name), _zooms(zooms), _bounds(bounds),
 	_zoom(_zooms.max()), _mapRatio(1.0), _tileRatio(tileRatio),
 	_tileSize(tileSize), _scalable(scalable), _invertY(invertY)
 {
@@ -128,9 +128,7 @@ void OnlineMap::draw(QPainter *painter, const QRectF &rect, Flags flags)
 		  : QPointF(-_tileSize/2, -_tileSize/2);
 
 		if (!t.pixmap().isNull()) {
-#ifdef ENABLE_HIDPI
 			t.pixmap().setDevicePixelRatio(imageRatio());
-#endif // ENABLE_HIDPI
 			painter->drawPixmap(tp, t.pixmap());
 		}
 	}

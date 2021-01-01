@@ -10,11 +10,10 @@
 #include "route.h"
 #include "parser.h"
 
-
 class Data
 {
 public:
-	Data(const QString &fileName);
+	Data(const QString &fileName, bool full = true);
 
 	bool isValid() const {return _valid;}
 	const QString &errorString() const {return _errorString;}

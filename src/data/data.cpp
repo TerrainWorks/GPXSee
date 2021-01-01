@@ -2,7 +2,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QLineF>
-#include "common/config.h"
 #include "gpxparser.h"
 #include "tcxparser.h"
 #include "csvparser.h"
@@ -13,13 +12,12 @@
 #include "oziparsers.h"
 #include "locparser.h"
 #include "slfparser.h"
-#ifdef ENABLE_GEOJSON
 #include "geojsonparser.h"
-#endif // ENABLE_GEOJSON
 #include "exifparser.h"
 #include "cupparser.h"
 #include "gpiparser.h"
 #include "smlparser.h"
+#include "map/map.h"
 #include "data.h"
 
 
@@ -35,9 +33,7 @@ static WPTParser wpt;
 static RTEParser rte;
 static LOCParser loc;
 static SLFParser slf;
-#ifdef ENABLE_GEOJSON
 static GeoJSONParser geojson;
-#endif // ENABLE_GEOJSON
 static EXIFParser exif;
 static CUPParser cup;
 static GPIParser gpi;
@@ -59,10 +55,8 @@ static QMap<QString, Parser*> parsers()
 	map.insert("rte", &rte);
 	map.insert("loc", &loc);
 	map.insert("slf", &slf);
-#ifdef ENABLE_GEOJSON
 	map.insert("json", &geojson);
 	map.insert("geojson", &geojson);
-#endif // ENABLE_GEOJSON
 	map.insert("jpeg", &exif);
 	map.insert("jpg", &exif);
 	map.insert("cup", &cup);
@@ -82,7 +76,7 @@ void Data::processData(QList<TrackData> &trackData, QList<RouteData> &routeData)
 		_routes.append(Route(routeData.at(i)));
 }
 
-Data::Data(const QString &fileName)
+Data::Data(const QString &fileName, bool tryUnknown)
 {
 	QFile file(fileName);
 	QFileInfo fi(fileName);
@@ -108,7 +102,7 @@ Data::Data(const QString &fileName)
 			_errorLine = it.value()->errorLine();
 			_errorString = it.value()->errorString();
 		}
-	} else {
+	} else if (tryUnknown) {
 		for (it = _parsers.begin(); it != _parsers.end(); it++) {
 			if (it.value()->parse(&file, trackData, routeData, _polygons,
 			  _waypoints)) {
@@ -136,9 +130,7 @@ QString Data::formats()
 	  + qApp->translate("Data", "CSV files") + " (*.csv);;"
 	  + qApp->translate("Data", "CUP files") + " (*.cup);;"
 	  + qApp->translate("Data", "FIT files") + " (*.fit);;"
-#ifdef ENABLE_GEOJSON
 	  + qApp->translate("Data", "GeoJSON files") + " (*.geojson *.json);;"
-#endif // ENABLE_GEOJSON
 	  + qApp->translate("Data", "GPI files") + " (*.gpi);;"
 	  + qApp->translate("Data", "GPX files") + " (*.gpx);;"
 	  + qApp->translate("Data", "IGC files") + " (*.igc);;"
