@@ -1,7 +1,7 @@
 #include <QDataStream>
-#include <QFileInfo>
 #include <QImageReader>
 #include "common/tifffile.h"
+#include "common/util.h"
 #include "exifparser.h"
 
 
@@ -211,7 +211,7 @@ bool EXIFParser::parseTIFF(QFile *file, QVector<Waypoint> &waypoints)
 	ImageInfo img(file->fileName(), QImageReader(file).size());
 
 	Waypoint wp(c);
-	wp.setName(QFileInfo(file->fileName()).baseName());
+	wp.setName(Util::file2name(file->fileName()));
 	wp.addImage(img);
 	wp.setElevation(altitude(tiff, GPSIFD.value(GPSAltitude),
 	  GPSIFD.value(GPSAltitudeRef)));

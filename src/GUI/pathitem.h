@@ -5,12 +5,13 @@
 #include <QPen>
 #include <QTimeZone>
 #include "data/path.h"
-#include "markeritem.h"
-#include "units.h"
 #include "graphicsscene.h"
+#include "units.h"
 
 class Map;
 class PathTickItem;
+class GraphItem;
+class MarkerItem;
 
 class PathItem : public QObject, public GraphicsItem
 {
@@ -27,7 +28,10 @@ public:
 
 	const Path &path() const {return _path;}
 
+	void addGraph(GraphItem *graph);
+
 	void setMap(Map *map);
+	void setGraph(int index);
 
 	void setColor(const QColor &color);
 	void setWidth(qreal width);
@@ -37,13 +41,14 @@ public:
 	void showMarker(bool show);
 	void showTicks(bool show);
 
+	void setMarkerPosition(qreal pos);
+
 	void updateTicks();
 
 	static void setUnits(Units units) {_units = units;}
 	static void setTimeZone(const QTimeZone &zone) {_timeZone = zone;}
 
 public slots:
-	void moveMarker(qreal distance);
 	void hover(bool hover);
 
 signals:
@@ -69,6 +74,8 @@ private:
 
 	Path _path;
 	Map *_map;
+	QList<GraphItem *> _graphs;
+	GraphItem *_graph;
 	qreal _markerDistance;
 	int _digitalZoom;
 

@@ -3,7 +3,7 @@ unix:!macx {
 } else {
     TARGET = GPXSee
 }
-VERSION = 8.1
+VERSION = 8.4
 
 QT += core \
     gui \
@@ -97,6 +97,7 @@ HEADERS += src/common/config.h \
     src/map/IMG/huffmantext.h \
     src/map/IMG/nodfile.h \
     src/map/IMG/mapdata.h \
+    src/map/IMG/raster.h \
     src/map/IMG/rastertile.h \
     src/map/IMG/textpathitem.h \
     src/map/IMG/textpointitem.h \
@@ -467,7 +468,6 @@ win32 {
 
 unix:!macx {
     isEmpty(PREFIX):PREFIX = /usr/local
-    DEFINES += PREFIX=\\\"$$PREFIX\\\"
 
     maps.files = pkg/maps/*
     maps.path = $$PREFIX/share/gpxsee/maps

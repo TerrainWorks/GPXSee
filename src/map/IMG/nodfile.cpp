@@ -27,10 +27,11 @@ static bool adjDistInfo(BitStream1 &bs, bool extraBit, bool &eog)
 {
 	quint32 data, cnt;
 
-	if (!bs.read(extraBit | 8, data))
+	if (!bs.read((int)extraBit | 8, data))
 		return false;
+	if (!extraBit)
+		data <<= 1;
 
-	data <<= !extraBit;
 	eog |= (quint8)data & 1;
 	data >>= 1;
 
@@ -50,8 +51,8 @@ static bool adjNodeInfo(BitStream1 &bs, bool extraBit, NodeOffset &offset)
 
 	if (!bs.read(9, data))
 		return false;
-
-	data <<= !extraBit;
+	if (!extraBit)
+		data <<= 1;
 
 	if (data & 1) {
 		offset.ext = true;
@@ -256,7 +257,7 @@ bool NODFile::nodeBlock(Handle &hdl, quint32 nodeOffset,
 	quint32 offsetSize = (_indexFlags & 3) + 1;
 
 	while (low <= high) {
-		quint32 m = ((low + high) / 2);
+		int m = ((low + high) / 2);
 		quint32 offset = _indexRecordSize * m + _indexOffset;
 		quint32 blockOffset, prevBlockOffset;
 
@@ -506,40 +507,32 @@ bool NODFile::linkType(Handle &hdl, const BlockInfo &blockInfo, quint8 linkId,
 	quint32 offset = ((blockInfo.hdr.s10 * blockInfo.hdr.se + 7) >> 3) + 0x13
 	  + blockInfo.offset + _blockOffset + ((blockInfo.hdr.s0 >> 0xb) & 1)
 	  + blockInfo.hdr.s11 * 3;
-	quint32 low = 0;
-	quint32 high = blockInfo.hdr.s12 - 1;
-	quint32 pos = blockInfo.hdr.s12;
+	int low = 0;
+	int high = blockInfo.hdr.s12 - 1;
 	quint16 val;
 
-	if (high > 1) {
-		do {
-			pos = (low + high) / 2;
+	while (low <= high) {
+		int m = ((low + high) / 2);
 
-			if (!(seek(hdl, offset + _blockRecordSize * pos)
-			  && readUInt16(hdl, val)))
-				return false;
-
-			if ((val >> 8) <= linkId)
-				low = pos;
-			else
-				high = pos;
-		} while (low + 1 < high);
-	}
-
-	if (!(seek(hdl, offset + _blockRecordSize * low) && readUInt16(hdl, val)))
-		return false;
-
-	type = val & 0x3f;
-
-	if ((low < high) && (pos != high)) {
-		if (!(seek(hdl, offset + _blockRecordSize * high)
-		  && readUInt16(hdl, val)))
+		if (!(seek(hdl, offset + _blockRecordSize * m) && readUInt16(hdl, val)))
 			return false;
-		if ((val >> 8) <= linkId)
-			type = (val & 0x3f);
+
+		if ((val >> 8) < linkId)
+			low = m + 1;
+		else if ((val >> 8) > linkId)
+			high = m - 1;
+		else {
+			type = (val & 0x3f) << 8;
+			return true;
+		}
 	}
 
-	type <<= 8;
+	if (high < 0)
+		return false;
+	if (blockInfo.hdr.s12 > 1 && !(seek(hdl, offset + _blockRecordSize * high)
+	  && readUInt16(hdl, val)))
+		return false;
+	type = (val & 0x3f) << 8;
 
 	return true;
 }

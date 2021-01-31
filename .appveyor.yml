@@ -1,4 +1,4 @@
-version: 8.1.{build}
+version: 8.4.{build}
 
 configuration:
   - Release
@@ -20,7 +20,14 @@ environment:
     VCVARS: vcvars64.bat
     OPENSSLDIR: C:\OpenSSL-v111-Win64\bin
     LIBCRYPTO: libssl-1_1-x64.dll
-    LIBSSL: libcrypto-1_1-x64.dll    
+    LIBSSL: libcrypto-1_1-x64.dll
+  - QTDIR: C:\Qt\6.0\msvc2019_64
+    NSI: gpxsee64.nsi
+    VCVARS: vcvars64.bat
+    OPENSSLDIR: C:\OpenSSL-v111-Win64\bin
+    LIBCRYPTO: libssl-1_1-x64.dll
+    LIBSSL: libcrypto-1_1-x64.dll
+    NSISDEF: /DQT6
 
 install:
 - cmd: >-
@@ -60,6 +67,6 @@ build_script:
     copy %OPENSSLDIR%\%LIBSSL% installer
 
 
-    makensis.exe installer\%NSI%
+    makensis.exe %NSISDEF% installer\%NSI%
 artifacts:
 - path: installer\GPXSee-*.exe

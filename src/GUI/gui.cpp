@@ -90,8 +90,7 @@ GUI::GUI()
 	_routeDistance = 0;
 	_time = 0;
 	_movingTime = 0;
-
-	_sliderPos = 0;
+	_lastGraphTab = 0;
 
 	_dataDir = QDir::homePath();
 	_mapDir = QDir::homePath();
@@ -284,7 +283,7 @@ void GUI::createActions()
 	_overlapPOIAction->setMenuRole(QAction::NoRole);
 	_overlapPOIAction->setCheckable(true);
 	connect(_overlapPOIAction, SIGNAL(triggered(bool)), _mapView,
-	  SLOT(setPOIOverlap(bool)));
+	  SLOT(showOverlappedPOIs(bool)));
 	_showPOILabelsAction = new QAction(tr("Show POI labels"), this);
 	_showPOILabelsAction->setMenuRole(QAction::NoRole);
 	_showPOILabelsAction->setCheckable(true);
@@ -375,6 +374,11 @@ void GUI::createActions()
 	_showTicksAction->setCheckable(true);
 	connect(_showTicksAction, SIGNAL(triggered(bool)), _mapView,
 	  SLOT(showTicks(bool)));
+	_showMarkersAction = new QAction(tr("Position markers"), this);
+	_showMarkersAction->setMenuRole(QAction::NoRole);
+	_showMarkersAction->setCheckable(true);
+	connect(_showMarkersAction, SIGNAL(triggered(bool)), _mapView,
+	  SLOT(showMarkers(bool)));
 
 	// Graph actions
 	_showGraphsAction = new QAction(QIcon(SHOW_GRAPHS_ICON), tr("Show graphs"),
@@ -411,11 +415,6 @@ void GUI::createActions()
 	_showGraphSliderInfoAction->setCheckable(true);
 	connect(_showGraphSliderInfoAction, SIGNAL(triggered(bool)), this,
 	  SLOT(showGraphSliderInfo(bool)));
-	_showMarkersAction = new QAction(tr("Show path markers"), this);
-	_showMarkersAction->setMenuRole(QAction::NoRole);
-	_showMarkersAction->setCheckable(true);
-	connect(_showMarkersAction, SIGNAL(triggered(bool)), _mapView,
-	  SLOT(showMarkers(bool)));
 
 	// Settings actions
 	_showToolbarsAction = new QAction(tr("Show toolbars"), this);
@@ -544,7 +543,6 @@ void GUI::createMenus()
 	graphMenu->addSeparator();
 	graphMenu->addAction(_showGraphGridAction);
 	graphMenu->addAction(_showGraphSliderInfoAction);
-	graphMenu->addAction(_showMarkersAction);
 	graphMenu->addSeparator();
 	graphMenu->addAction(_showGraphsAction);
 
@@ -565,6 +563,7 @@ void GUI::createMenus()
 	displayMenu->addAction(_showWaypointLabelsAction);
 	displayMenu->addAction(_showRouteWaypointsAction);
 	displayMenu->addAction(_showTicksAction);
+	displayMenu->addAction(_showMarkersAction);
 	dataMenu->addSeparator();
 	dataMenu->addAction(_showTracksAction);
 	dataMenu->addAction(_showRoutesAction);
@@ -662,13 +661,8 @@ void GUI::createGraphTabs()
 	_tabs.append(new TemperatureGraph(_graphTabWidget));
 	_tabs.append(new GearRatioGraph(_graphTabWidget));
 
-	for (int i = 0; i < _tabs.count(); i++) {
-#if defined(Q_OS_WIN32) || defined(Q_OS_MAC)
-		_tabs.at(i)->setFrameShape(QFrame::NoFrame);
-#endif // Q_OS_WIN32 || Q_OS_MAC
-		connect(_tabs.at(i), SIGNAL(sliderPositionChanged(qreal)), this,
-		  SLOT(sliderPositionChanged(qreal)));
-	}
+	connect(_tabs.first(), SIGNAL(sliderPositionChanged(qreal)), _mapView,
+	  SLOT(setMarkerPosition(qreal)));
 }
 
 void GUI::createStatusBar()
@@ -865,17 +859,19 @@ void GUI::loadData(const Data &data)
 		_splitter->refresh();
 	paths = _mapView->loadData(data);
 
+	GraphTab *gt = static_cast<GraphTab*>(_graphTabWidget->currentWidget());
+	int index = _graphTabWidget->currentIndex();
+
 	for (int i = 0; i < paths.count(); i++) {
-		const PathItem *pi = paths.at(i);
-		for (int j = 0; j < graphs.count(); j++) {
-			const GraphItem *gi = graphs.at(j).at(i);
-			if (!gi)
-				continue;
-			connect(gi, SIGNAL(sliderPositionChanged(qreal)), pi,
-			        SLOT(moveMarker(qreal)));
-			connect(pi, SIGNAL(selected(bool)), gi, SLOT(hover(bool)));
-			connect(gi, SIGNAL(selected(bool)), pi, SLOT(hover(bool)));
-		}
+		PathItem *pi = paths.at(i);
+		if (!pi)
+			continue;
+
+		for (int j = 0; j < graphs.count(); j++)
+			pi->addGraph(graphs.at(j).at(i));
+
+		pi->setGraph(index);
+		pi->setMarkerPosition(gt->sliderPosition());
 	}
 }
 
@@ -1308,8 +1304,6 @@ void GUI::reloadFiles()
 		_tabs.at(i)->clear();
 	_mapView->clear();
 
-	_sliderPos = 0;
-
 	for (int i = 0; i < _files.size(); i++) {
 		if (!loadFile(_files.at(i))) {
 			_files.removeAt(i);
@@ -1337,8 +1331,6 @@ void GUI::closeFiles()
 	_movingTime = 0;
 	_dateRange = DateTimeRange(QDateTime(), QDateTime());
 	_pathName = QString();
-
-	_sliderPos = 0;
 
 	for (int i = 0; i < _tabs.count(); i++)
 		_tabs.at(i)->clear();
@@ -1679,18 +1671,25 @@ void GUI::poiFileChecked(int index)
 	  _poiFilesActions.at(index)->isChecked());
 }
 
-void GUI::sliderPositionChanged(qreal pos)
-{
-	_sliderPos = pos;
-}
-
 void GUI::graphChanged(int index)
 {
 	if (index < 0)
 		return;
 
+	_mapView->setGraph(index);
+
 	GraphTab *gt = static_cast<GraphTab*>(_graphTabWidget->widget(index));
-	gt->setSliderPosition(_sliderPos);
+	if (_lastGraphTab)
+		disconnect(_lastGraphTab, SIGNAL(sliderPositionChanged(qreal)),
+		  _mapView, SLOT(setMarkerPosition(qreal)));
+
+	connect(gt, SIGNAL(sliderPositionChanged(qreal)), _mapView,
+	  SLOT(setMarkerPosition(qreal)));
+
+	if (_lastGraphTab)
+		gt->setSliderPosition(_lastGraphTab->sliderPosition());
+
+	_lastGraphTab = gt;
 }
 
 void GUI::updateNavigationActions()
@@ -1769,12 +1768,8 @@ void GUI::setCoordinatesFormat(CoordinatesFormat format)
 
 void GUI::setGraphType(GraphType type)
 {
-	_sliderPos = 0;
-
-	for (int i = 0; i <_tabs.count(); i++) {
+	for (int i = 0; i <_tabs.count(); i++)
 		_tabs.at(i)->setGraphType(type);
-		_tabs.at(i)->setSliderPosition(0);
-	}
 }
 
 void GUI::next()
@@ -1968,9 +1963,6 @@ void GUI::writeSettings()
 	  != SHOW_GRAPH_SLIDER_INFO_DEFAULT)
 		settings.setValue(SHOW_GRAPH_SLIDER_INFO_SETTING,
 		  _showGraphSliderInfoAction->isChecked());
-	if (_showMarkersAction->isChecked() != SHOW_MARKERS_DEFAULT)
-		settings.setValue(SHOW_MARKERS_SETTING,
-		  _showMarkersAction->isChecked());
 	settings.endGroup();
 
 	settings.beginGroup(POI_SETTINGS_GROUP);
@@ -2011,6 +2003,9 @@ void GUI::writeSettings()
 	if (_showTicksAction->isChecked() != SHOW_TICKS_DEFAULT)
 		settings.setValue(SHOW_TICKS_SETTING,
 		  _showTicksAction->isChecked());
+	if (_showMarkersAction->isChecked() != SHOW_MARKERS_DEFAULT)
+		settings.setValue(SHOW_MARKERS_SETTING,
+		  _showMarkersAction->isChecked());
 	settings.endGroup();
 
 	settings.beginGroup(PDF_EXPORT_SETTINGS_GROUP);
@@ -2238,15 +2233,11 @@ void GUI::readSettings()
 		showGraphSliderInfo(false);
 	else
 		_showGraphSliderInfoAction->setChecked(true);
-	if (!settings.value(SHOW_MARKERS_SETTING, SHOW_MARKERS_DEFAULT).toBool())
-		_mapView->showMarkers(false);
-	else
-		_showMarkersAction->setChecked(true);
 	settings.endGroup();
 
 	settings.beginGroup(POI_SETTINGS_GROUP);
 	if (!settings.value(OVERLAP_POI_SETTING, OVERLAP_POI_DEFAULT).toBool())
-		_mapView->setPOIOverlap(false);
+		_mapView->showOverlappedPOIs(false);
 	else
 		_overlapPOIAction->setChecked(true);
 	if (!settings.value(LABELS_POI_SETTING, LABELS_POI_DEFAULT).toBool())
@@ -2308,6 +2299,10 @@ void GUI::readSettings()
 		_mapView->showTicks(true);
 		_showTicksAction->setChecked(true);
 	}
+	if (!settings.value(SHOW_MARKERS_SETTING, SHOW_MARKERS_DEFAULT).toBool())
+		_mapView->showMarkers(false);
+	else
+		_showMarkersAction->setChecked(true);
 	settings.endGroup();
 
 	settings.beginGroup(PDF_EXPORT_SETTINGS_GROUP);

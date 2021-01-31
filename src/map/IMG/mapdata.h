@@ -9,6 +9,7 @@
 #include "common/rtree.h"
 #include "common/range.h"
 #include "label.h"
+#include "raster.h"
 
 class Style;
 class SubDiv;
@@ -25,6 +26,7 @@ public:
 		   parallel. */
 		QVector<QPointF> points;
 		Label label;
+		Raster raster;
 		quint32 type;
 		RectC boundingRect;
 
@@ -58,7 +60,7 @@ public:
 	void load();
 	void clear();
 
-	virtual QString fileName() const = 0;
+	virtual const QString &fileName() const = 0;
 
 	bool isValid() const {return _valid;}
 	QString errorString() const {return _errorString;}

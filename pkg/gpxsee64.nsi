@@ -7,7 +7,7 @@
 ; The name of the installer
 Name "GPXSee"
 ; Program version
-!define VERSION "8.1"
+!define VERSION "8.4"
 
 ; The file to write
 OutFile "GPXSee-${VERSION}_x64.exe"
@@ -182,6 +182,17 @@ Section "QT framework" SEC_QT
 
   SectionIn RO
 
+!ifdef QT6
+  File "Qt6Concurrent.dll"
+  File "Qt6Core.dll"
+  File "Qt6Gui.dll"
+  File "Qt6Network.dll"
+  File "Qt6OpenGL.dll"
+  File "Qt6OpenGLWidgets.dll"
+  File "Qt6PrintSupport.dll"
+  File "Qt6Sql.dll"
+  File "Qt6Widgets.dll"
+!else
   File "Qt5Core.dll"
   File "Qt5Gui.dll"
   File "Qt5Widgets.dll"
@@ -189,9 +200,10 @@ Section "QT framework" SEC_QT
   File "Qt5Network.dll"
   File "Qt5Sql.dll"
   File "Qt5Concurrent.dll"
+  File /r "printsupport"
+!endif
   File /r "platforms"
   File /r "imageformats"
-  File /r "printsupport"
   File /r "styles"
   File /r "sqldrivers"
 
@@ -215,6 +227,7 @@ Section "OpenSSL" SEC_OPENSSL
 
 SectionEnd
 
+!ifndef QT6
 Section "ANGLE" SEC_ANGLE
 
   File "libGLESv2.dll"
@@ -222,6 +235,7 @@ Section "ANGLE" SEC_ANGLE
   File "D3DCompiler_47.dll"
 
 SectionEnd
+!endif
 
 SectionGroup "Localization" SEC_LOCALIZATION
   !insertmacro LOCALIZATION "Czech" "cs"

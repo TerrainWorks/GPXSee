@@ -93,6 +93,26 @@ bool LBLFile::load(Handle &hdl, const RGNFile *rgn, Handle &rgnHdl)
 		}
 	}
 
+	if (hdrLen >= 0x19A) {
+		quint32 offset, recordSize, size, flags;
+		if (!(seek(hdl, _gmpOffset + 0x184) && readUInt32(hdl, offset)
+		  && readUInt32(hdl, size) && readUInt16(hdl, recordSize)
+		  && readUInt32(hdl, flags) && readUInt32(hdl, _imgOffset)
+		  && readUInt32(hdl, _imgSize)))
+			return false;
+		quint32 count = size ? size / recordSize : 0;
+
+		quint32 maxId = count - 1;
+		_imgOffsetIdSize = 0;
+		do {
+			_imgOffsetIdSize++;
+			maxId = maxId >> 8;
+		} while (maxId != 0);
+
+		if (!loadFiles(hdl, count, offset, recordSize))
+			return false;
+	}
+
 	if (_encoding == 11) {
 		_huffmanText = new HuffmanText();
 		if (!_huffmanText->load(rgn, rgnHdl))
@@ -282,4 +302,45 @@ Label LBLFile::label(Handle &hdl, quint32 offset, bool poi, bool capitalize) con
 		default:
 			return Label();
 	}
+}
+
+bool LBLFile::loadFiles(Handle &hdl, quint32 count, quint32 offset,
+  quint32 recordSize)
+{
+	_rasters.resize(count);
+
+	for (quint32 i = 0; i < count; i++) {
+		quint32 currentOffset, nextOffset, size;
+
+		if (!(seek(hdl, offset + i * recordSize)
+		  && readVUInt32(hdl, recordSize, currentOffset)))
+			return false;
+		if (i == count - 1)
+			nextOffset = _imgSize;
+		else {
+			if (!readVUInt32(hdl, recordSize, nextOffset))
+				return false;
+		}
+		size = nextOffset - currentOffset;
+
+		_rasters[i] = File(currentOffset, size);
+	}
+
+	return true;
+}
+
+QImage LBLFile::readImage(Handle &hdl, quint32 id) const
+{
+	if (id >= (quint32)_rasters.size())
+		return QImage();
+
+	if (!seek(hdl, _imgOffset + _rasters.at(id).offset))
+		return QImage();
+	QByteArray ba;
+	ba.resize(_rasters.at(id).size);
+	for (int i = 0; i < ba.size(); i++)
+		if (!readUInt8(hdl, *(ba.data() + i)))
+			return QImage();
+
+	return QImage::fromData(ba);
 }

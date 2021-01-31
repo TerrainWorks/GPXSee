@@ -5,6 +5,7 @@
 #include "textpointitem.h"
 #include "bitmapline.h"
 #include "style.h"
+#include "lblfile.h"
 #include "rastertile.h"
 
 
@@ -217,11 +218,33 @@ void RasterTile::drawPolygons(QPainter *painter)
 			const MapData::Poly &poly = _polygons.at(i);
 			if (poly.type != _style->drawOrder().at(n))
 				continue;
-			const Style::Polygon &style = _style->polygon(poly.type);
 
-			painter->setPen(style.pen());
-			painter->setBrush(style.brush());
-			painter->drawPolygon(poly.points);
+			if (poly.raster.isValid()) {
+				RectC r(poly.raster.rect());
+				QPointF tl(_map->ll2xy(r.topLeft()));
+				QPointF br(_map->ll2xy(r.bottomRight()));
+				QSize size(QRectF(tl, br).toRect().size());
+
+				SubFile::Handle hdl(poly.raster.lbl());
+				QImage img(poly.raster.lbl()->readImage(hdl, poly.raster.id()));
+				qreal sx = (qreal)size.width() / (qreal)img.width();
+				qreal sy = (qreal)size.height() / (qreal)img.height();
+
+				painter->save();
+				painter->scale(sx, sy);
+				painter->drawImage(QPointF(tl.x() / sx, tl.y() / sy), img);
+				painter->restore();
+
+				//painter->setPen(Qt::blue);
+				//painter->setBrush(Qt::NoBrush);
+				//painter->drawRect(QRectF(tl, br));
+			} else {
+				const Style::Polygon &style = _style->polygon(poly.type);
+
+				painter->setPen(style.pen());
+				painter->setBrush(style.brush());
+				painter->drawPolygon(poly.points);
+			}
 		}
 	}
 }
